@@ -1,15 +1,112 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  GUEST
+  RESERVATIONS
+  SALES
+  ADMIN
+  GM
+}
+
+enum RoomCategory {
+  ROOM
+  VILLA
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  EXPIRED
+  FAILED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  phone        String?
+  role         UserRole @default(GUEST)
+}
+
+model RoomType {
+  id           String       @id @default(uuid())
+  category     RoomCategory @unique
+  maxGuests    Int
+  totalUnits   Int
+
+  bookingItems BookingItem[]
+  dailyRates   DailyRate[]
+  allotments   WebsiteAllotment[]
+}
+
+model Booking {
+  id String @id @default(uuid())
+
+  guestName  String
+  guestEmail String
+  guestPhone String
+
+  checkIn  DateTime
+  checkOut DateTime
+
+  adults   Int
+  children Int @default(0)
+
+  status BookingStatus @default(PENDING_PAYMENT)
+
+  items BookingItem[]
+}
+
+model BookingItem {
+  id String @id @default(uuid())
+
+  bookingId  String
+  roomTypeId String
+
+  quantity Int
+
+  booking  Booking  @relation(fields: [bookingId], references: [id])
+  roomType RoomType @relation(fields: [roomTypeId], references: [id])
+}
+
+model RatePlan {
+  id         String      @id @default(uuid())
+  name       String      @unique
+  dailyRates DailyRate[]
+}
+
+model DailyRate {
+  id         String   @id @default(uuid())
+
+  roomTypeId String
+  ratePlanId String
+
+  date       DateTime @db.Date
+  price      Decimal  @db.Decimal(10, 2)
+  gstRate    Decimal  @db.Decimal(5, 2)
+
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+  ratePlan   RatePlan @relation(fields: [ratePlanId], references: [id])
+
+  @@unique([roomTypeId, ratePlanId, date])
+}
+
+model WebsiteAllotment {
+  id           String   @id @default(uuid())
+  roomTypeId   String
+  date         DateTime @db.Date
+  allottedUnits Int
+
+  roomType RoomType @relation(fields: [roomTypeId], references: [id])
+
+  @@unique([roomTypeId, date])
 }

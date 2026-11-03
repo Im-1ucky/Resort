@@ -18,6 +18,7 @@
     "zod": "^4.6.7"
   },
   "scripts": {
-    "postinstall": "prisma skills sync || exit 0"
+    "postinstall": "prisma skills sync || exit 0",
+    "db:seed": "bun prisma/seed.js"
   }
 }
