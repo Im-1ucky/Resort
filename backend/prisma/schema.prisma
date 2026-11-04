@@ -52,6 +52,8 @@ model Room {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([roomTypeId, isActive])
 }
 
 model RoomType {
@@ -65,6 +67,7 @@ model RoomType {
   dailyRates   DailyRate[]
   allotments   WebsiteAllotment[]
   rooms        Room[]
+  blackoutDates BlackoutDate[]
 }
 
 model RoomAssignment {
@@ -79,6 +82,7 @@ model RoomAssignment {
 
   @@unique([bookingId, roomId])
   @@index([roomId])
+  @@index([bookingId])
 }
 
 model Booking {
@@ -100,8 +104,8 @@ model Booking {
   status        BookingStatus @default(PENDING_PAYMENT)
   holdExpiresAt DateTime?
 
-  items    BookingItem[]
-  payments Payment[]
+  items           BookingItem[]
+  payments        Payment[]
   roomAssignments RoomAssignment[]
 }
 
@@ -163,4 +167,13 @@ model WebsiteAllotment {
   roomType RoomType @relation(fields: [roomTypeId], references: [id])
 
   @@unique([roomTypeId, date])
+}
+
+model BlackoutDate {
+  id         String   @id @default(uuid())
+  date       DateTime @db.Date
+  roomTypeId String?
+  roomType   RoomType? @relation(fields: [roomTypeId], references: [id])
+
+  @@unique([date, roomTypeId])
 }

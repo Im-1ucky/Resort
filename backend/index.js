@@ -5,6 +5,8 @@ import availabilityRoutes from "./src/routes/availability.js";
 import bookingRoutes from "./src/routes/bookings.js";
 import rateRoutes from "./src/routes/rates.js";
 import paymentRoutes from "./src/routes/payments.js";
+import roomRoutes from "./src/routes/rooms.js";
+import allotmentRoutes from "./src/routes/allotments.js";
 
 dotenv.config();
 
@@ -32,6 +34,9 @@ app.use("/api/rates", rateRoutes);
 
 app.use("/api", paymentRoutes);
 
+app.use("/api/rooms", roomRoutes);
+
+app.use("/api/allotments", allotmentRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {
