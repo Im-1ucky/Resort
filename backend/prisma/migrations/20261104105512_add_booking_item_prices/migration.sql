@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "BookingItem" ADD COLUMN     "gstAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "subtotal" DECIMAL(12,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "totalAmount" DECIMAL(12,2) NOT NULL DEFAULT 0;

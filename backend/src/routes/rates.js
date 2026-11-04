@@ -1,11 +1,13 @@
+
 import express from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 
 const router = express.Router();
 
+// GET /api/rates?roomTypeId=<id>
 const rateQuerySchema = z.object({
-  category: z.enum(["ROOM", "VILLA"]).optional(),
+  roomTypeId: z.string().uuid().optional(),
 });
 
 router.get("/", async (req, res) => {
@@ -14,24 +16,21 @@ router.get("/", async (req, res) => {
   if (!result.success) {
     return res.status(400).json({
       success: false,
-      message: "Invalid category",
+      message: "Invalid room type ID",
       errors: result.error.issues,
     });
   }
 
   try {
     const rates = await prisma.dailyRate.findMany({
-      where: result.data.category
-        ? {
-            roomType: {
-              category: result.data.category,
-            },
-          }
+      where: result.data.roomTypeId
+        ? { roomTypeId: result.data.roomTypeId }
         : {},
       include: {
         roomType: {
           select: {
-            category: true,
+            id: true,
+            name: true,
           },
         },
         ratePlan: {
@@ -43,7 +42,7 @@ router.get("/", async (req, res) => {
       orderBy: [
         {
           roomType: {
-            category: "asc",
+            name: "asc",
           },
         },
         {
@@ -67,8 +66,9 @@ router.get("/", async (req, res) => {
   }
 });
 
+// POST /api/rates
 const createRateSchema = z.object({
-  category: z.enum(["ROOM", "VILLA"]),
+  roomTypeId: z.string().uuid(),
   price: z.coerce.number().positive().max(1000000),
   gstRate: z.coerce.number().min(0).max(100),
   effectiveDate: z.iso.date(),
@@ -85,11 +85,11 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const { category, price, gstRate, effectiveDate } = result.data;
+  const { roomTypeId, price, gstRate, effectiveDate } = result.data;
 
   try {
     const roomType = await prisma.roomType.findUnique({
-      where: { category },
+      where: { id: roomTypeId },
     });
 
     if (!roomType) {
@@ -99,16 +99,20 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const ratePlan = await prisma.ratePlan.findUnique({
+    const ratePlan = await prisma.ratePlan.upsert({
       where: { name: "STANDARD" },
+      update: {},
+      create: { name: "STANDARD" },
     });
+
+    const date = new Date(`${effectiveDate}T00:00:00.000Z`);
 
     const rate = await prisma.dailyRate.upsert({
       where: {
         roomTypeId_ratePlanId_date: {
           roomTypeId: roomType.id,
           ratePlanId: ratePlan.id,
-          date: new Date(`${effectiveDate}T00:00:00.000Z`),
+          date,
         },
       },
       update: {
@@ -118,7 +122,7 @@ router.post("/", async (req, res) => {
       create: {
         roomTypeId: roomType.id,
         ratePlanId: ratePlan.id,
-        date: new Date(`${effectiveDate}T00:00:00.000Z`),
+        date,
         price,
         gstRate,
       },

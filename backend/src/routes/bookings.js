@@ -137,6 +137,11 @@ router.post("/", async (req, res) => {
           },
           include: {
             items: true,
+            roomAssignments: {
+              include: {
+                room: true,
+              },
+            },
           },
         }),
 
@@ -151,7 +156,36 @@ router.post("/", async (req, res) => {
         }),
       ]);
 
-      // Check availability for every category on every night.
+      // Ensure every existing active booking has all required
+      // physical rooms assigned for the selected categories.
+      for (const booking of bookings) {
+        for (const bookingItem of booking.items) {
+          // Only validate categories involved in this new booking.
+          if (!roomTypeIds.includes(bookingItem.roomTypeId)) {
+            continue;
+          }
+
+          const assignedCount = booking.roomAssignments.filter(
+            (assignment) =>
+              assignment.room.roomTypeId === bookingItem.roomTypeId
+          ).length;
+
+          if (assignedCount < bookingItem.quantity) {
+            const roomType = roomTypes.find(
+              (type) => type.id === bookingItem.roomTypeId
+            );
+
+            return {
+              status: 409,
+              message: `Existing ${roomType.name} booking needs physical room assignments before new bookings can be accepted for these dates.`,
+            };
+          }
+        }
+      }
+
+      // Store the physical room IDs selected for each category.
+      const selectedRooms = [];
+
       for (const item of items) {
         const roomType = roomTypes.find(
           (type) => type.id === item.roomTypeId
@@ -159,10 +193,7 @@ router.post("/", async (req, res) => {
 
         const categoryBookings = bookings.flatMap((booking) =>
           booking.items
-            .filter(
-              (bookingItem) =>
-                bookingItem.roomTypeId === roomType.id
-            )
+            .filter((bookingItem) => bookingItem.roomTypeId === roomType.id)
             .map((bookingItem) => ({
               checkIn: booking.checkIn,
               checkOut: booking.checkOut,
@@ -206,15 +237,137 @@ router.post("/", async (req, res) => {
           );
         }
 
-        if (item.quantity > minimumAvailable) {
+        // Find physical rooms with no overlapping active assignments.
+        const availableRooms = await tx.room.findMany({
+          where: {
+            roomTypeId: roomType.id,
+            isActive: true,
+            assignments: {
+              none: {
+                booking: {
+                  checkIn: { lt: endDate },
+                  checkOut: { gt: startDate },
+                  OR: [
+                    { status: "CONFIRMED" },
+                    {
+                      status: "PENDING_PAYMENT",
+                      holdExpiresAt: { gt: now },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          orderBy: {
+            roomNumber: "asc",
+          },
+          take: item.quantity,
+        });
+
+        const physicalAvailable = availableRooms.length;
+
+        const actualAvailable = Math.min(
+          minimumAvailable,
+          physicalAvailable
+        );
+
+        if (item.quantity > actualAvailable) {
           return {
             status: 409,
-            message: `Only ${minimumAvailable} ${roomType.name} unit(s) available for the selected dates`,
+            message: `Only ${actualAvailable} ${roomType.name} unit(s) available for the selected dates`,
           };
         }
+
+        selectedRooms.push({
+          roomTypeId: roomType.id,
+          roomIds: availableRooms.map((room) => room.id),
+        });
       }
 
-      // Inventory is available. Create booking and its items.
+      // Fetch STANDARD rates for the selected categories.
+      const rates = await tx.dailyRate.findMany({
+        where: {
+          roomTypeId: { in: roomTypeIds },
+          ratePlan: { name: "STANDARD" },
+          date: { lt: endDate },
+        },
+        orderBy: {
+          date: "asc",
+        },
+      });
+
+      const itemPrices = [];
+
+      let bookingSubtotalPaise = 0;
+      let bookingGstPaise = 0;
+
+      // Calculate the price of every selected category.
+      for (const item of items) {
+        const categoryRates = rates.filter(
+          (rate) => rate.roomTypeId === item.roomTypeId
+        );
+
+        let itemSubtotalPaise = 0;
+        let itemGstPaise = 0;
+
+        for (
+          let night = new Date(startDate);
+          night < endDate;
+          night.setUTCDate(night.getUTCDate() + 1)
+        ) {
+          // Find the latest rate effective on or before this night.
+          const applicableRate = categoryRates
+            .filter((rate) => rate.date <= night)
+            .at(-1);
+
+          if (!applicableRate) {
+            const roomType = roomTypes.find(
+              (type) => type.id === item.roomTypeId
+            );
+
+            return {
+              status: 409,
+              message: `No rate configured for ${roomType.name} on ${night.toISOString().slice(0, 10)}`,
+            };
+          }
+
+          // Calculate in paise to avoid floating-point currency errors.
+          const unitPricePaise = Math.round(
+            Number(applicableRate.price) * 100
+          );
+
+          const nightSubtotalPaise =
+            unitPricePaise * item.quantity;
+
+          const nightGstPaise = Math.round(
+            nightSubtotalPaise * Number(applicableRate.gstRate) / 100
+          );
+
+          itemSubtotalPaise += nightSubtotalPaise;
+          itemGstPaise += nightGstPaise;
+        }
+
+        itemPrices.push({
+          roomTypeId: item.roomTypeId,
+          quantity: item.quantity,
+          subtotal: (itemSubtotalPaise / 100).toFixed(2),
+          gstAmount: (itemGstPaise / 100).toFixed(2),
+          totalAmount: (
+            (itemSubtotalPaise + itemGstPaise) / 100
+          ).toFixed(2),
+        });
+
+        bookingSubtotalPaise += itemSubtotalPaise;
+        bookingGstPaise += itemGstPaise;
+      }
+
+      const subtotal = (bookingSubtotalPaise / 100).toFixed(2);
+      const gstAmount = (bookingGstPaise / 100).toFixed(2);
+      const totalAmount = (
+        (bookingSubtotalPaise + bookingGstPaise) / 100
+      ).toFixed(2);
+
+      // Inventory is available. Create booking, items and physical room assignments.
       const booking = await tx.booking.create({
         data: {
           guestName,
@@ -224,19 +377,43 @@ router.post("/", async (req, res) => {
           checkOut: endDate,
           adults,
           children,
+
+          subtotal,
+          gstAmount,
+          totalAmount,
+
           status: "PENDING_PAYMENT",
           holdExpiresAt,
+
           items: {
-            create: items.map((item) => ({
-              roomTypeId: item.roomTypeId,
-              quantity: item.quantity,
-            })),
+            create: itemPrices,
+          },
+
+          // Assign the selected physical rooms to this booking.
+          roomAssignments: {
+            create: selectedRooms.flatMap((category) =>
+              category.roomIds.map((roomId) => ({
+                roomId,
+              }))
+            ),
           },
         },
+
         include: {
           items: {
             include: {
               roomType: true,
+            },
+          },
+
+          // Return assigned room numbers in the response.
+          roomAssignments: {
+            include: {
+              room: {
+                include: {
+                  roomType: true,
+                },
+              },
             },
           },
         },
