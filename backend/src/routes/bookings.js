@@ -121,6 +121,39 @@ router.post("/", async (req, res) => {
 
       const roomTypeIds = roomTypes.map((type) => type.id);
 
+      // Reject bookings that overlap property-wide or category-specific blackouts.
+      const blackouts = await tx.blackoutDate.findMany({
+        where: {
+          date: {
+            gte: startDate,
+            lt: endDate,
+          },
+          OR: [
+            { roomTypeId: null },
+            { roomTypeId: { in: roomTypeIds } },
+          ],
+        },
+      });
+
+      if (blackouts.length > 0) {
+        const blockedRoomTypeIds = new Set(
+          blackouts.map((blackout) => blackout.roomTypeId)
+        );
+
+        const propertyWideBlocked = blockedRoomTypeIds.has(null);
+
+        const blockedCategories = propertyWideBlocked
+          ? roomTypes.map((type) => type.name)
+          : roomTypes
+              .filter((type) => blockedRoomTypeIds.has(type.id))
+              .map((type) => type.name);
+
+        return {
+          status: 409,
+          message: `Booking unavailable due to blackout dates: ${blockedCategories.join(", ")}`,
+        };
+      }
+
       // Fetch overlapping confirmed bookings and active payment holds.
       const [bookings, allotments] = await Promise.all([
         tx.booking.findMany({

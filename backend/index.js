@@ -7,6 +7,7 @@ import rateRoutes from "./src/routes/rates.js";
 import paymentRoutes from "./src/routes/payments.js";
 import roomRoutes from "./src/routes/rooms.js";
 import allotmentRoutes from "./src/routes/allotments.js";
+import blackoutRoutes from "./src/routes/blackouts.js";
 
 dotenv.config();
 
@@ -37,6 +38,8 @@ app.use("/api", paymentRoutes);
 app.use("/api/rooms", roomRoutes);
 
 app.use("/api/allotments", allotmentRoutes);
+
+app.use("/api/blackouts", blackoutRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

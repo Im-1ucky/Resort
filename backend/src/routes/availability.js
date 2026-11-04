@@ -52,7 +52,7 @@ router.get("/", async (req, res) => {
 
     const roomTypeIds = suitableRoomTypes.map((type) => type.id);
 
-    const [allotments, bookings] = await Promise.all([
+    const [allotments, bookings, blackouts] = await Promise.all([
       prisma.websiteAllotment.findMany({
         where: {
           roomTypeId: { in: roomTypeIds },
@@ -81,6 +81,16 @@ router.get("/", async (req, res) => {
           },
         },
       }),
+
+      prisma.blackoutDate.findMany({
+        where: {
+          date: { gte: startDate, lt: endDate },
+          OR: [
+            { roomTypeId: null },
+            { roomTypeId: { in: roomTypeIds } },
+          ],
+        },
+      }),
     ]);
 
     // Do not advertise inventory if an existing active booking
@@ -104,6 +114,11 @@ router.get("/", async (req, res) => {
 
     const availableRoomTypes = await Promise.all(
       suitableRoomTypes.map(async (roomType) => {
+        const isBlocked = blackouts.some(
+          (blackout) =>
+            blackout.roomTypeId === null ||
+            blackout.roomTypeId === roomType.id
+        );
         // Find physical rooms that are free for the entire stay.
         const availableRooms = await prisma.room.findMany({
           where: {
@@ -183,10 +198,13 @@ router.get("/", async (req, res) => {
           maxGuests: roomType.maxGuests,
           totalUnits: roomType.totalUnits,
           isActive: roomType.isActive,
-          availableUnits: Math.min(
-            availableRooms.length,
-            minimumAllotmentAvailability
-          ),
+          isBlocked,
+          availableUnits: isBlocked
+            ? 0
+            : Math.min(
+                availableRooms.length,
+                minimumAllotmentAvailability
+              ),
         };
       })
     );
