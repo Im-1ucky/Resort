@@ -8,6 +8,8 @@ import paymentRoutes from "./src/routes/payments.js";
 import roomRoutes from "./src/routes/rooms.js";
 import allotmentRoutes from "./src/routes/allotments.js";
 import blackoutRoutes from "./src/routes/blackouts.js";
+import promoRoutes from "./src/routes/promos.js";
+import { expirePendingBookings } from "./src/services/bookingExpiry.js";
 
 dotenv.config();
 
@@ -41,12 +43,28 @@ app.use("/api/allotments", allotmentRoutes);
 
 app.use("/api/blackouts", blackoutRoutes);
 
+app.use("/api/promos", promoRoutes);
+
 // Health check
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
     message: "Resort API is running!",
   });
+});
+
+// Expire pending bookings every 60 seconds.
+setInterval(async () => {
+  try {
+    await expirePendingBookings();
+  } catch (error) {
+    console.error("Booking expiry job failed:", error);
+  }
+}, 60_000);
+
+// Run once when the server starts.
+expirePendingBookings().catch((error) => {
+  console.error("Initial booking expiry failed:", error);
 });
 
 // Start server

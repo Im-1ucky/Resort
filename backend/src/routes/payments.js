@@ -4,6 +4,20 @@ import prisma from "../lib/prisma.js";
 
 const router = express.Router();
 
+async function releasePromoUse(tx, booking) {
+  if (!booking.promoCodeId) return;
+
+  await tx.promoCode.updateMany({
+    where: {
+      id: booking.promoCodeId,
+      usedCount: { gt: 0 },
+    },
+    data: {
+      usedCount: { decrement: 1 },
+    },
+  });
+}
+
 // Create a payment attempt.
 router.post("/bookings/:id/pay", async (req, res) => {
   const { id } = req.params;
@@ -41,6 +55,8 @@ router.post("/bookings/:id/pay", async (req, res) => {
             holdExpiresAt: null,
           },
         });
+
+        await releasePromoUse(tx, booking);
 
         return { status: 409, message: "Booking hold has expired" };
       }
@@ -171,6 +187,7 @@ router.post("/payments/:id/simulate", async (req, res) => {
               holdExpiresAt: null,
             },
           });
+          await releasePromoUse(tx, booking);
         }
 
         return {
@@ -205,6 +222,10 @@ router.post("/payments/:id/simulate", async (req, res) => {
                 where: { id: booking.id },
                 data: { status: "PAYMENT_REVIEW" },
               });
+
+        if (booking.status === "PENDING_PAYMENT") {
+          await releasePromoUse(tx, booking);
+        }
 
         return {
           status: 200,

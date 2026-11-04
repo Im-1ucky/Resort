@@ -31,6 +31,11 @@ enum PaymentStatus {
   FAILED
 }
 
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
 model User {
   id           String   @id @default(uuid())
   name         String
@@ -107,6 +112,10 @@ model Booking {
   items           BookingItem[]
   payments        Payment[]
   roomAssignments RoomAssignment[]
+
+  promoCodeId    String?
+  discountAmount Decimal @default(0) @db.Decimal(12, 2)
+  promoCode      PromoCode? @relation(fields: [promoCodeId], references: [id])
 }
 
 model BookingItem {
@@ -176,4 +185,20 @@ model BlackoutDate {
   roomType   RoomType? @relation(fields: [roomTypeId], references: [id])
 
   @@unique([date, roomTypeId])
+}
+
+model PromoCode {
+  id              String       @id @default(uuid())
+  code            String       @unique
+  discountType    DiscountType
+  discountValue   Decimal      @db.Decimal(10, 2)
+  minBookingAmount Decimal     @default(0) @db.Decimal(12, 2)
+  startsAt        DateTime
+  expiresAt       DateTime
+  maxUses         Int?
+  usedCount       Int          @default(0)
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  bookings Booking[]
 }

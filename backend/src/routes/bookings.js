@@ -25,6 +25,8 @@ const bookingSchema = z
         })
       )
       .min(1),
+
+    promoCode: z.string().trim().min(1).max(30).optional(),
   })
   .refine((data) => data.checkOut > data.checkIn, {
     message: "Check-out must be after check-in",
@@ -68,6 +70,7 @@ router.post("/", async (req, res) => {
     adults,
     children,
     items,
+    promoCode,
   } = result.data;
 
   const startDate = new Date(`${checkIn}T00:00:00.000Z`);
@@ -394,11 +397,97 @@ router.post("/", async (req, res) => {
         bookingGstPaise += itemGstPaise;
       }
 
-      const subtotal = (bookingSubtotalPaise / 100).toFixed(2);
-      const gstAmount = (bookingGstPaise / 100).toFixed(2);
+      let promo = null;
+
+      if (promoCode) {
+        // Lock the promo row to prevent concurrent usage-limit bypasses.
+        const promos = await tx.$queryRaw`
+          SELECT *
+          FROM "PromoCode"
+          WHERE "code" = ${promoCode.toUpperCase()}
+          FOR UPDATE
+        `;
+
+        promo = promos[0];
+
+        if (!promo || !promo.isActive) {
+          return {
+            status: 400,
+            message: "Invalid promo code",
+          };
+        }
+
+        if (now < promo.startsAt || now > promo.expiresAt) {
+          return {
+            status: 400,
+            message: "Promo code is not currently valid",
+          };
+        }
+
+        if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) {
+          return {
+            status: 400,
+            message: "Promo code usage limit reached",
+          };
+        }
+
+        if (
+          bookingSubtotalPaise / 100 <
+          Number(promo.minBookingAmount)
+        ) {
+          return {
+            status: 400,
+            message: `Minimum booking amount is ₹${promo.minBookingAmount}`,
+          };
+        }
+      }
+
+      let discountPaise = 0;
+
+      if (promo) {
+        const discountValuePaise = Math.round(
+          Number(promo.discountValue) * 100
+        );
+
+        discountPaise =
+          promo.discountType === "PERCENTAGE"
+            ? Math.round(
+                (bookingSubtotalPaise * discountValuePaise) / 10000
+              )
+            : discountValuePaise;
+
+        // A discount cannot exceed the booking subtotal.
+        discountPaise = Math.min(discountPaise, bookingSubtotalPaise);
+      }
+
+      const discountedSubtotalPaise =
+        bookingSubtotalPaise - discountPaise;
+
+      // Reduce GST proportionally because the discount applies before tax.
+      const discountedGstPaise =
+        bookingSubtotalPaise > 0
+          ? Math.round(
+              (bookingGstPaise * discountedSubtotalPaise) /
+                bookingSubtotalPaise
+            )
+          : 0;
+
+      const subtotal = (discountedSubtotalPaise / 100).toFixed(2);
+      const gstAmount = (discountedGstPaise / 100).toFixed(2);
+      const discountAmount = (discountPaise / 100).toFixed(2);
+
       const totalAmount = (
-        (bookingSubtotalPaise + bookingGstPaise) / 100
+        (discountedSubtotalPaise + discountedGstPaise) / 100
       ).toFixed(2);
+
+      if (promo) {
+        await tx.promoCode.update({
+          where: { id: promo.id },
+          data: {
+            usedCount: { increment: 1 },
+          },
+        });
+      }
 
       // Inventory is available. Create booking, items and physical room assignments.
       const booking = await tx.booking.create({
@@ -414,6 +503,8 @@ router.post("/", async (req, res) => {
           subtotal,
           gstAmount,
           totalAmount,
+          promoCodeId: promo?.id ?? null,
+          discountAmount,
 
           status: "PENDING_PAYMENT",
           holdExpiresAt,
