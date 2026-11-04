@@ -14,11 +14,7 @@ enum UserRole {
   SALES
   ADMIN
   GM
-}
-
-enum RoomCategory {
-  ROOM
-  VILLA
+  DEV
 }
 
 enum BookingStatus {
@@ -38,10 +34,11 @@ model User {
 }
 
 model RoomType {
-  id           String       @id @default(uuid())
-  category     RoomCategory @unique
-  maxGuests    Int
-  totalUnits   Int
+  id         String  @id @default(uuid())
+  name       String  @unique
+  maxGuests  Int
+  totalUnits Int
+  isActive   Boolean @default(true)
 
   bookingItems BookingItem[]
   dailyRates   DailyRate[]
@@ -55,15 +52,17 @@ model Booking {
   guestEmail String
   guestPhone String
 
-  checkIn  DateTime
-  checkOut DateTime
+  checkIn  DateTime @db.Date
+  checkOut DateTime @db.Date
 
   adults   Int
   children Int @default(0)
 
   status BookingStatus @default(PENDING_PAYMENT)
+  holdExpiresAt DateTime?
 
   items BookingItem[]
+
 }
 
 model BookingItem {

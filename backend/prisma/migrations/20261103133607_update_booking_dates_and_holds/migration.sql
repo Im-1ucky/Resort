@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Booking" ADD COLUMN     "holdExpiresAt" TIMESTAMP(3),
+ALTER COLUMN "checkIn" SET DATA TYPE DATE,
+ALTER COLUMN "checkOut" SET DATA TYPE DATE;
