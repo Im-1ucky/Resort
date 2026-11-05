@@ -1,7 +1,8 @@
-
 import express from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
+import { authenticate, authorize } from "../middleware/auth.js";
+import crypto from "node:crypto";
 
 const router = express.Router();
 
@@ -78,6 +79,13 @@ router.post("/", async (req, res) => {
 
   const now = new Date();
   const holdExpiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+
+  const cancellationToken = crypto.randomBytes(32).toString("hex");
+
+  const cancellationTokenHash = crypto
+    .createHash("sha256")
+    .update(cancellationToken)
+    .digest("hex");
 
   try {
     const outcome = await prisma.$transaction(async (tx) => {
@@ -508,6 +516,7 @@ router.post("/", async (req, res) => {
 
           status: "PENDING_PAYMENT",
           holdExpiresAt,
+          cancellationTokenHash,
 
           items: {
             create: itemPrices,
@@ -549,6 +558,7 @@ router.post("/", async (req, res) => {
       success: true,
       message: "Booking created. Complete payment before the hold expires.",
       booking: outcome.booking,
+      cancellationToken,
     });
   } catch (error) {
     console.error("Booking creation failed:", error);
@@ -559,5 +569,322 @@ router.post("/", async (req, res) => {
     });
   }
 });
+
+// CANCEL BOOKING
+router.post("/:id/cancel", async (req, res) => {
+  try {
+    const idResult = z.string().uuid().safeParse(req.params.id);
+
+    if (!idResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking ID",
+      });
+    }
+
+    const { cancellationToken } = req.body ?? {};
+
+    const isStaff = Boolean(req.cookies?.token);
+    let staffUser = null;
+
+    // Authenticate staff if a session cookie is supplied.
+    if (isStaff) {
+      const jwt = await import("jsonwebtoken");
+
+      try {
+        const decoded = jwt.default.verify(
+          req.cookies.token,
+          process.env.JWT_SECRET
+        );
+
+        staffUser = await prisma.user.findUnique({
+          where: { id: decoded.userId },
+          select: { id: true, role: true },
+        });
+      } catch {
+        staffUser = null;
+      }
+    }
+
+    const allowedStaffRoles = [
+      "ADMIN",
+      "RESERVATIONS",
+      "GM",
+      "DEV",
+    ];
+
+    const isAuthorizedStaff =
+      staffUser && allowedStaffRoles.includes(staffUser.role);
+
+    if (!isAuthorizedStaff && typeof cancellationToken !== "string") {
+      return res.status(401).json({
+        success: false,
+        message: "Valid cancellation token or staff login required",
+      });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: idResult.data },
+      select: {
+        id: true,
+        status: true,
+        cancellationTokenHash: true,
+        promoCodeId: true,
+      },
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+
+    // Guests must prove ownership using their private token.
+    if (!isAuthorizedStaff) {
+      const suppliedHash = crypto
+        .createHash("sha256")
+        .update(cancellationToken)
+        .digest("hex");
+
+      if (
+        !booking.cancellationTokenHash ||
+        suppliedHash !== booking.cancellationTokenHash
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Invalid cancellation token",
+        });
+      }
+    }
+
+    if (!["PENDING_PAYMENT", "CONFIRMED"].includes(booking.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Booking cannot be cancelled because its status is ${booking.status}`,
+      });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.booking.updateMany({
+        where: {
+          id: booking.id,
+          status: booking.status,
+        },
+        data: {
+          status: "CANCELLED",
+          holdExpiresAt: null,
+        },
+      });
+
+      if (result.count === 1 && booking.promoCodeId) {
+        await tx.promoCode.updateMany({
+          where: {
+            id: booking.promoCodeId,
+            usedCount: { gt: 0 },
+          },
+          data: {
+            usedCount: { decrement: 1 },
+          },
+        });
+      }
+
+      return result;
+    });
+
+    if (updated.count !== 1) {
+      return res.status(409).json({
+        success: false,
+        message: "Booking status changed. Please try again.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Booking cancelled successfully",
+    });
+  } catch (error) {
+    console.error("Booking cancellation failed:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to cancel booking",
+    });
+  }
+});
+
+// STAFF BOOKING LIST AND SEARCH
+router.get(
+  "/",
+  authenticate,
+  authorize("ADMIN", "RESERVATIONS", "GM", "DEV"),
+  async (req, res) => {
+    const querySchema = z.object({
+      search: z.string().trim().max(100).optional(),
+      status: z.enum([
+        "PENDING_PAYMENT",
+        "CONFIRMED",
+        "FAILED",
+        "EXPIRED",
+        "PAYMENT_REVIEW",
+        "CANCELLED",
+      ]).optional(),
+      checkIn: z.iso.date().optional(),
+      page: z.coerce.number().int().min(1).default(1),
+      limit: z.coerce.number().int().min(1).max(100).default(20),
+    });
+
+    const parsed = querySchema.safeParse(req.query);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid search filters",
+        errors: parsed.error.issues,
+      });
+    }
+
+    try {
+      const { search, status, checkIn, page, limit } = parsed.data;
+
+      const where = {
+        ...(status && { status }),
+        ...(checkIn && {
+          checkIn: new Date(`${checkIn}T00:00:00.000Z`),
+        }),
+        ...(search && {
+          OR: [
+            {
+              guestName: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+            {
+              guestEmail: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+            {
+              guestPhone: {
+                contains: search,
+              },
+            },
+            {
+              id: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          ],
+        }),
+      };
+
+      const [bookings, total] = await prisma.$transaction([
+        prisma.booking.findMany({
+          where,
+          include: {
+            items: {
+              include: {
+                roomType: true,
+              },
+            },
+            roomAssignments: {
+              include: {
+                room: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.booking.count({ where }),
+      ]);
+
+      return res.json({
+        success: true,
+        bookings,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error("Booking list failed:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Unable to retrieve bookings",
+      });
+    }
+  }
+);
+
+// STAFF BOOKING LOOKUP
+router.get(
+  "/:id",
+  authenticate,
+  authorize("ADMIN", "RESERVATIONS", "GM", "DEV"),
+  async (req, res) => {
+    try {
+      const idResult = z.string().uuid().safeParse(req.params.id);
+
+      if (!idResult.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid booking ID",
+        });
+      }
+
+      const booking = await prisma.booking.findUnique({
+        where: {
+          id: idResult.data,
+        },
+        include: {
+          items: {
+            include: {
+              roomType: true,
+            },
+          },
+          roomAssignments: {
+            include: {
+              room: {
+                include: {
+                  roomType: true,
+                },
+              },
+            },
+          },
+          payments: true,
+        },
+      });
+
+      if (!booking) {
+        return res.status(404).json({
+          success: false,
+          message: "Booking not found",
+        });
+      }
+
+      return res.json({
+        success: true,
+        booking,
+      });
+    } catch (error) {
+      console.error("Booking lookup failed:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Unable to retrieve booking",
+      });
+    }
+  }
+);
 
 export default router;

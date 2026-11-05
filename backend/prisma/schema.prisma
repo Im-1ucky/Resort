@@ -23,6 +23,7 @@ enum BookingStatus {
   FAILED
   EXPIRED
   PAYMENT_REVIEW
+  CANCELLED
 }
 
 enum PaymentStatus {
@@ -116,6 +117,9 @@ model Booking {
   promoCodeId    String?
   discountAmount Decimal @default(0) @db.Decimal(12, 2)
   promoCode      PromoCode? @relation(fields: [promoCodeId], references: [id])
+
+  cancellationTokenHash String? @unique
+  createdAt DateTime @default(now())
 }
 
 model BookingItem {

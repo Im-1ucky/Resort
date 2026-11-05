@@ -214,6 +214,17 @@ router.post("/payments/:id/simulate", async (req, res) => {
         };
       }
 
+      // A successful payment after cancellation needs manual refund handling.
+      if (booking.status === "CANCELLED") {
+        return {
+          status: 200,
+          message:
+            "Payment succeeded after cancellation. Booking remains cancelled; refund reconciliation is required.",
+          payment: updatedPayment,
+          booking,
+        };
+      }
+
       // A successful payment for an expired or failed booking
       // requires manual reconciliation.
       if (
