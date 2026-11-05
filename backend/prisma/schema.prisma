@@ -37,6 +37,57 @@ enum DiscountType {
   FIXED
 }
 
+enum EnquirySource {
+  WEBSITE
+  EMAIL
+  WHATSAPP
+}
+
+enum EnquiryCategory {
+  UNCLASSIFIED
+  ROOM_BOOKING
+  WEDDING_EVENT
+  CORPORATE_OFFSITE
+  COMPLAINT
+  GENERAL
+}
+
+enum EnquiryDepartment {
+  UNSORTED
+  RESERVATIONS
+  SALES
+  GM
+}
+
+enum EnquiryStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_GUEST
+  RESOLVED
+  CLOSED
+}
+
+enum EnquiryMessageDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum EnquiryMessageSender {
+  GUEST
+  STAFF
+  AI
+  SYSTEM
+}
+
+enum ReplyDraftStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  SENT
+}
+
 model User {
   id           String   @id @default(uuid())
   name         String
@@ -44,6 +95,12 @@ model User {
   passwordHash String
   phone        String?
   role         UserRole @default(GUEST)
+
+  assignedEnquiries Enquiry[]              @relation("EnquiryAssignee")
+  enquiryMessages   EnquiryMessage[]
+  enquiryNotes      EnquiryNote[]
+  approvedDrafts    EnquiryReplyDraft[]    @relation("DraftApprover")
+  enquiryHistory    EnquiryStatusHistory[]
 }
 
 model Room {
@@ -70,10 +127,10 @@ model RoomType {
   totalUnits Int
   isActive   Boolean @default(true)
 
-  bookingItems BookingItem[]
-  dailyRates   DailyRate[]
-  allotments   WebsiteAllotment[]
-  rooms        Room[]
+  bookingItems  BookingItem[]
+  dailyRates    DailyRate[]
+  allotments    WebsiteAllotment[]
+  rooms         Room[]
   blackoutDates BlackoutDate[]
 }
 
@@ -116,11 +173,13 @@ model Booking {
   roomAssignments RoomAssignment[]
 
   promoCodeId    String?
-  discountAmount Decimal @default(0) @db.Decimal(12, 2)
+  discountAmount Decimal    @default(0) @db.Decimal(12, 2)
   promoCode      PromoCode? @relation(fields: [promoCodeId], references: [id])
 
-  cancellationTokenHash String? @unique
-  createdAt DateTime @default(now())
+  cancellationTokenHash String?  @unique
+  createdAt             DateTime @default(now())
+
+  enquiries Enquiry[]
 }
 
 model BookingItem {
@@ -184,8 +243,8 @@ model WebsiteAllotment {
 }
 
 model BlackoutDate {
-  id         String   @id @default(uuid())
-  date       DateTime @db.Date
+  id         String    @id @default(uuid())
+  date       DateTime  @db.Date
   roomTypeId String?
   roomType   RoomType? @relation(fields: [roomTypeId], references: [id])
 
@@ -193,17 +252,134 @@ model BlackoutDate {
 }
 
 model PromoCode {
-  id              String       @id @default(uuid())
-  code            String       @unique
-  discountType    DiscountType
-  discountValue   Decimal      @db.Decimal(10, 2)
-  minBookingAmount Decimal     @default(0) @db.Decimal(12, 2)
-  startsAt        DateTime
-  expiresAt       DateTime
-  maxUses         Int?
-  usedCount       Int          @default(0)
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
+  id               String       @id @default(uuid())
+  code             String       @unique
+  discountType     DiscountType
+  discountValue    Decimal      @db.Decimal(10, 2)
+  minBookingAmount Decimal      @default(0) @db.Decimal(12, 2)
+  startsAt         DateTime
+  expiresAt        DateTime
+  maxUses          Int?
+  usedCount        Int          @default(0)
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
 
   bookings Booking[]
+}
+
+model Enquiry {
+  id         String  @id @default(uuid())
+  guestName  String
+  guestEmail String?
+  guestPhone String?
+  subject    String
+
+  source     EnquirySource     @default(WEBSITE)
+  category   EnquiryCategory   @default(UNCLASSIFIED)
+  department EnquiryDepartment @default(UNSORTED)
+  status     EnquiryStatus     @default(NEW)
+
+  aiConfidence    Decimal? @db.Decimal(5, 4)
+  aiSummary       String?
+  aiExtractedData Json?
+
+  assignedToId String?
+  assignedTo   User?   @relation("EnquiryAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  relatedBookingId String?
+  relatedBooking   Booking? @relation(fields: [relatedBookingId], references: [id], onDelete: SetNull)
+
+  eventType       String?
+  eventDate       DateTime? @db.Date
+  eventGuestCount Int?
+  eventBudget     Decimal?  @db.Decimal(12, 2)
+
+  externalThreadId String?
+  lastMessageAt    DateTime?
+
+  messages      EnquiryMessage[]
+  notes         EnquiryNote[]
+  replyDrafts   EnquiryReplyDraft[]
+  statusHistory EnquiryStatusHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([department, status, createdAt])
+  @@index([assignedToId, status])
+  @@index([category, createdAt])
+  @@index([guestEmail])
+  @@index([externalThreadId])
+}
+
+model EnquiryMessage {
+  id        String  @id @default(uuid())
+  enquiryId String
+  enquiry   Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  senderType EnquiryMessageSender
+  direction  EnquiryMessageDirection
+  source     EnquirySource
+
+  senderUserId String?
+  senderUser   User?   @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  content           String
+  externalMessageId String? @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([enquiryId, createdAt])
+}
+
+model EnquiryNote {
+  id        String  @id @default(uuid())
+  enquiryId String
+  enquiry   Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([enquiryId, createdAt])
+}
+
+model EnquiryReplyDraft {
+  id        String  @id @default(uuid())
+  enquiryId String
+  enquiry   Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  content String
+  status  ReplyDraftStatus @default(PENDING_REVIEW)
+
+  approvedById String?
+  approvedBy   User?   @relation("DraftApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  reviewedAt DateTime?
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([enquiryId, status])
+}
+
+model EnquiryStatusHistory {
+  id        String  @id @default(uuid())
+  enquiryId String
+  enquiry   Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  changedById String?
+  changedBy   User?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  fromStatus     EnquiryStatus?
+  toStatus       EnquiryStatus?
+  fromDepartment EnquiryDepartment?
+  toDepartment   EnquiryDepartment?
+  note           String?
+
+  createdAt DateTime @default(now())
+
+  @@index([enquiryId, createdAt])
 }

@@ -555,10 +555,15 @@ router.post("/", async (req, res) => {
       });
     }
 
+    const {
+      cancellationTokenHash: storedTokenHash,
+      ...publicBooking
+    } = outcome.booking;
+
     return res.status(201).json({
       success: true,
       message: "Booking created. Complete payment before the hold expires.",
-      booking: outcome.booking,
+      booking: publicBooking,
       cancellationToken,
     });
   } catch (error) {
@@ -806,9 +811,13 @@ router.get(
         prisma.booking.count({ where }),
       ]);
 
+      const safeBookings = bookings.map(
+        ({ cancellationTokenHash, ...booking }) => booking
+      );
+
       return res.json({
         success: true,
-        bookings,
+        bookings: safeBookings,
         pagination: {
           page,
           limit,
@@ -826,6 +835,204 @@ router.get(
     }
   }
 );
+
+
+// STAFF DAILY / DATE-RANGE BOOKING CSV EXPORT
+router.get(
+  "/export",
+  authenticate,
+  authorize("ADMIN", "RESERVATIONS", "GM", "DEV"),
+  async (req, res) => {
+    const querySchema = z.object({
+      from: z.iso.date().optional(),
+      to: z.iso.date().optional(),
+    }).refine(
+      (data) => Boolean(data.from) === Boolean(data.to),
+      { message: "Provide both from and to dates, or neither" }
+    );
+
+    const parsed = querySchema.safeParse(req.query);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date range. Provide both from and to as YYYY-MM-DD.",
+        errors: parsed.error.issues,
+      });
+    }
+
+    try {
+      const today = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+      }).format(new Date());
+
+      const from = parsed.data.from || today;
+      const to = parsed.data.to || today;
+
+      if (from > to) {
+        return res.status(400).json({
+          success: false,
+          message: "'from' date cannot be after 'to' date",
+        });
+      }
+
+      // Convert Indian local-day boundaries to UTC instants.
+      const startDate = new Date(`${from}T00:00:00+05:30`);
+      const endDate = new Date(
+        new Date(`${to}T00:00:00+05:30`).getTime() + 24 * 60 * 60 * 1000
+      );
+
+      const bookings = await prisma.booking.findMany({
+        where: {
+          createdAt: {
+            gte: startDate,
+            lt: endDate,
+          },
+        },
+        select: {
+          id: true,
+          guestName: true,
+          guestEmail: true,
+          guestPhone: true,
+          checkIn: true,
+          checkOut: true,
+          adults: true,
+          children: true,
+          status: true,
+          subtotal: true,
+          gstAmount: true,
+          discountAmount: true,
+          totalAmount: true,
+          createdAt: true,
+          items: {
+            select: {
+              quantity: true,
+              roomType: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+          roomAssignments: {
+            select: {
+              room: {
+                select: {
+                  roomNumber: true,
+                  roomType: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          payments: {
+            select: {
+              status: true,
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+            take: 1,
+          },
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
+
+      const csvCell = (value) => {
+        let text = value == null ? "" : String(value);
+
+        // Prevent spreadsheet formula injection from guest-provided data.
+        if (/^[\t\r=+\-@]/.test(text)) {
+          text = `'${text}`;
+        }
+
+        return `"${text.replaceAll('"', '""')}"`;
+      };
+
+      const headers = [
+        "Booking ID",
+        "Booking Created At",
+        "Guest Name",
+        "Guest Email",
+        "Guest Phone",
+        "Check In",
+        "Check Out",
+        "Adults",
+        "Children",
+        "Room Categories",
+        "Assigned Room Numbers",
+        "Booking Status",
+        "Payment Status",
+        "Subtotal",
+        "Discount",
+        "GST",
+        "Total Amount",
+      ];
+
+      const rows = bookings.map((booking) => {
+        const categories = booking.items
+          .map((item) => `${item.roomType.name} x ${item.quantity}`)
+          .join("; ");
+
+        const assignedRooms = booking.roomAssignments
+          .map((assignment) => {
+            const room = assignment.room;
+            return `${room.roomType.name}: ${room.roomNumber}`;
+          })
+          .join("; ");
+
+        const latestPaymentStatus =
+          booking.payments[0]?.status || "NO_PAYMENT";
+
+        return [
+          booking.id,
+          booking.createdAt.toISOString(),
+          booking.guestName,
+          booking.guestEmail,
+          booking.guestPhone,
+          booking.checkIn.toISOString().slice(0, 10),
+          booking.checkOut.toISOString().slice(0, 10),
+          booking.adults,
+          booking.children,
+          categories,
+          assignedRooms,
+          booking.status,
+          latestPaymentStatus,
+          booking.subtotal,
+          booking.discountAmount,
+          booking.gstAmount,
+          booking.totalAmount,
+        ];
+      });
+
+      const csv = [
+        headers.map(csvCell).join(","),
+        ...rows.map((row) => row.map(csvCell).join(",")),
+      ].join("\r\n");
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="bookings-${from}-to-${to}.csv"`
+      );
+
+      return res.send(`\uFEFF${csv}`);
+    } catch (error) {
+      console.error("Booking CSV export failed:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Unable to export bookings",
+      });
+    }
+  }
+);
+
 
 // STAFF BOOKING LOOKUP
 router.get(
@@ -873,9 +1080,11 @@ router.get(
         });
       }
 
+      const { cancellationTokenHash, ...safeBooking } = booking;
+
       return res.json({
         success: true,
-        booking,
+        booking: safeBooking,
       });
     } catch (error) {
       console.error("Booking lookup failed:", error);

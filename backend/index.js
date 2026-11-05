@@ -13,6 +13,9 @@ import { expirePendingBookings } from "./src/services/bookingExpiry.js";
 import cookieParser from "cookie-parser";
 import authRoutes from "./src/routes/auth.js";
 import roomTypeRoutes from "./src/routes/roomTypes.js";
+import enquiryRoutes from "./src/routes/enquiries.js";
+import enquiryInboxRoutes from "./src/routes/enquiryInbox.js";
+import analyticsRoutes from "./src/routes/analytics.js";
 
 dotenv.config();
 
@@ -53,6 +56,13 @@ app.use("/api/promos", promoRoutes);
 app.use("/api/auth", authRoutes);
 
 app.use("/api/room-types", roomTypeRoutes);
+
+app.use("/api", enquiryRoutes);
+
+app.use("/api/enquiries", enquiryInboxRoutes);
+
+app.use("/api/analytics", analyticsRoutes);
+
 
 // Health check
 app.get("/api/health", (req, res) => {

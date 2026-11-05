@@ -1,4 +1,5 @@
 
+import { test, expect, afterAll } from "bun:test";
 import prisma from "../src/lib/prisma.js";
 
 const API_URL = "http://localhost:3000/api/bookings";
@@ -11,21 +12,22 @@ const testEmails = [
   "concurrency-b@example.com",
 ];
 
-async function main() {
+afterAll(async () => {
+  await prisma.$disconnect();
+});
+
+test("concurrent bookings must not oversell inventory", async () => {
   const room = await prisma.roomType.findUnique({
-    where: { category: "ROOM" },
+    where: { name: "ROOM" },
   });
 
-  if (!room) {
-    throw new Error("ROOM category not found");
-  }
+  expect(room).not.toBeNull();
 
   const dates = [
     new Date(`${checkIn}T00:00:00.000Z`),
     new Date("2026-11-21T00:00:00.000Z"),
   ];
 
-  // Save existing allotments so we can restore them afterward.
   const previousAllotments = await prisma.websiteAllotment.findMany({
     where: {
       roomTypeId: room.id,
@@ -34,7 +36,6 @@ async function main() {
   });
 
   try {
-    // Temporarily make only one ROOM available on both nights.
     for (const date of dates) {
       await prisma.websiteAllotment.upsert({
         where: {
@@ -55,9 +56,7 @@ async function main() {
     const createRequest = (email) =>
       fetch(API_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           guestName: "Concurrency Tester",
           guestEmail: email,
@@ -66,13 +65,9 @@ async function main() {
           checkOut,
           adults: 1,
           children: 0,
-          items: [
-            { category: "ROOM", quantity: 1 },
-          ],
+          items: [{ roomTypeId: room.id, quantity: 1 }],
         }),
       });
-
-    console.log("Sending two booking requests simultaneously...");
 
     const responses = await Promise.all(
       testEmails.map(createRequest)
@@ -85,47 +80,35 @@ async function main() {
       }))
     );
 
-    console.log("\nResults:");
-    console.log(JSON.stringify(results, null, 2));
+    console.log("Booking responses:", JSON.stringify(results, null, 2));
 
-    const successful = results.filter(
-      (result) => result.status === 201
-    );
+    const statuses = results.map((result) => result.status);
 
-    const rejected = results.filter(
-      (result) => result.status === 409
-    );
-
-    if (successful.length === 1 && rejected.length === 1) {
-      console.log("\nPASS: Exactly one booking succeeded.");
-      console.log("PASS: The other booking was rejected.");
-    } else {
-      throw new Error(
-        `Expected one 201 and one 409, got: ${results
-          .map((result) => result.status)
-          .join(", ")}`
-      );
-    }
+    expect(statuses.filter((status) => status === 201)).toHaveLength(1);
+    expect(statuses.filter((status) => status === 409)).toHaveLength(1);
   } finally {
-    // Remove only bookings created by this test.
     const bookings = await prisma.booking.findMany({
-      where: {
-        guestEmail: { in: testEmails },
-      },
+      where: { guestEmail: { in: testEmails } },
       select: { id: true },
     });
 
     const bookingIds = bookings.map((booking) => booking.id);
 
-    await prisma.bookingItem.deleteMany({
-      where: { bookingId: { in: bookingIds } },
-    });
+    await prisma.$transaction([
+      prisma.bookingItem.deleteMany({
+        where: { bookingId: { in: bookingIds } },
+      }),
+      prisma.roomAssignment.deleteMany({
+        where: { bookingId: { in: bookingIds } },
+      }),
+      prisma.payment.deleteMany({
+        where: { bookingId: { in: bookingIds } },
+      }),
+      prisma.booking.deleteMany({
+        where: { id: { in: bookingIds } },
+      }),
+    ]);
 
-    await prisma.booking.deleteMany({
-      where: { id: { in: bookingIds } },
-    });
-
-    // Restore previous allotments.
     for (const date of dates) {
       const previous = previousAllotments.find(
         (item) => item.date.getTime() === date.getTime()
@@ -138,23 +121,9 @@ async function main() {
         });
       } else {
         await prisma.websiteAllotment.deleteMany({
-          where: {
-            roomTypeId: room.id,
-            date,
-          },
+          where: { roomTypeId: room.id, date },
         });
       }
     }
-
-    console.log("\nTest bookings removed and allotments restored.");
   }
-}
-
-main()
-  .catch((error) => {
-    console.error("\nConcurrency test failed:", error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+});

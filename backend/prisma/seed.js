@@ -1,58 +1,39 @@
-
 import prisma from "../src/lib/prisma.js";
 
 async function main() {
   // 1. Seed room categories
   const roomTypes = [
-    {
-      name: "ROOM",
-      maxGuests: 4,
-      totalUnits: 64,
-    },
-    {
-      name: "VILLA",
-      maxGuests: 8,
-      totalUnits: 12,
-    },
+    { name: "ROOM", maxGuests: 4, totalUnits: 64 },
+    { name: "VILLA", maxGuests: 8, totalUnits: 12 },
   ];
 
   for (const roomType of roomTypes) {
     await prisma.roomType.upsert({
-      where: {
-        name: roomType.name,
-      },
-      update: {
-        maxGuests: roomType.maxGuests,
-        totalUnits: roomType.totalUnits,
-      },
+      where: { name: roomType.name },
+      update: { maxGuests: roomType.maxGuests },
       create: roomType,
     });
   }
 
   console.log("Room categories seeded successfully!");
 
-  // 2. Create the default rate plan
+  // 2. Seed default rate plan
   const ratePlan = await prisma.ratePlan.upsert({
-    where: {
-      name: "STANDARD",
-    },
+    where: { name: "STANDARD" },
     update: {},
-    create: {
-      name: "STANDARD",
-    },
+    create: { name: "STANDARD" },
   });
 
-  // 3. Get the seeded room categories
-  const seededRoomTypes = await prisma.roomType.findMany();
+  // 3. Get demo room categories
+  const seededRoomTypes = await prisma.roomType.findMany({
+    where: { name: { in: ["ROOM", "VILLA"] } },
+  });
 
-  // 4. Seed starting demo rates
+  // 4. Seed today's demo rates
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
-  const defaultRates = {
-    ROOM: 5000,
-    VILLA: 10000,
-  };
+  const defaultRates = { ROOM: 5000, VILLA: 10000 };
 
   for (const roomType of seededRoomTypes) {
     await prisma.dailyRate.upsert({
@@ -74,7 +55,74 @@ async function main() {
     });
   }
 
-  console.log("Default rate plan and demo rates seeded successfully!");
+  console.log("Demo rates seeded successfully!");
+
+  // 5. Seed assignment sample enquiries
+  const sampleEnquiries = [
+    {
+      externalMessageId: "ENQ-4410",
+      guestName: "Ananya Sharma",
+      guestEmail: "ananya@example.com",
+      subject: "Wedding venue enquiry - February 2027",
+      content:
+        "Venue for my sister's wedding in Feb 2027, about 250 guests, 2 nights",
+      category: "WEDDING_EVENT",
+      department: "SALES",
+      eventType: "WEDDING",
+      eventDate: new Date("2027-02-15"),
+      eventGuestCount: 250,
+    },
+    {
+      externalMessageId: "ENQ-4411",
+      guestName: "Rahul Kumar",
+      guestEmail: "rahul@example.com",
+      subject: "Villa availability enquiry",
+      content: "Is a villa free 14-16 Nov for 2 adults and a child?",
+      category: "ROOM_BOOKING",
+      department: "RESERVATIONS",
+    },
+    {
+      externalMessageId: "ENQ-4412",
+      guestName: "Arjun Mehta",
+      guestEmail: "arjun@example.com",
+      subject: "Corporate offsite enquiry - January",
+      content: "Team of 45 wants a January offsite with a conference hall",
+      category: "CORPORATE_OFFSITE",
+      department: "SALES",
+      eventType: "CORPORATE_OFFSITE",
+      eventGuestCount: 45,
+    },
+  ];
+
+  for (const sample of sampleEnquiries) {
+    const existingMessage = await prisma.enquiryMessage.findUnique({
+      where: { externalMessageId: sample.externalMessageId },
+    });
+
+    if (existingMessage) continue;
+
+    const { externalMessageId, content, ...enquiryData } = sample;
+
+    await prisma.enquiry.create({
+      data: {
+        ...enquiryData,
+        source: "WEBSITE",
+        status: "NEW",
+        lastMessageAt: new Date(),
+        messages: {
+          create: {
+            senderType: "GUEST",
+            direction: "INBOUND",
+            source: "WEBSITE",
+            content,
+            externalMessageId,
+          },
+        },
+      },
+    });
+  }
+
+  console.log("Assignment sample enquiries seeded successfully!");
 }
 
 main()
