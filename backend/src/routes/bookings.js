@@ -286,6 +286,7 @@ router.post("/", async (req, res) => {
           where: {
             roomTypeId: roomType.id,
             isActive: true,
+            isRetired: false,
             assignments: {
               none: {
                 booking: {
