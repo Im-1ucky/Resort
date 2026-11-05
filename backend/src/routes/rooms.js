@@ -1,6 +1,7 @@
 import express from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
+import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -9,7 +10,11 @@ const createRoomSchema = z.object({
   roomTypeId: z.string().uuid(),
 });
 
-router.post("/", async (req, res) => {
+router.post(
+  "/",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
   const parsed = createRoomSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -61,7 +66,11 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/", async (req, res) => {
+router.get(
+  "/",
+  authenticate,
+  authorize("ADMIN", "RESERVATIONS", "GM"),
+  async (req, res) => {
   const roomTypeId = req.query.roomTypeId;
   const isActive = z.enum(["true", "false"]).optional().safeParse(
     req.query.isActive
@@ -78,7 +87,7 @@ router.get("/", async (req, res) => {
       where: {
         ...(roomTypeId ? { roomTypeId } : {}),
         ...(isActive.data !== undefined
-          ? { isActive: isActive === "true" }
+          ? { isActive: isActive.data === "true" }
           : {}),
       },
       include: {
@@ -111,7 +120,11 @@ const updateRoomStatusSchema = z.object({
   isActive: z.boolean(),
 });
 
-router.patch("/:id/status", async (req, res) => {
+router.patch(
+  "/:id/status",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
   const { id } = req.params;
   const parsed = updateRoomStatusSchema.safeParse(req.body);
 

@@ -1,6 +1,7 @@
 import express from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
+import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -23,7 +24,11 @@ const promoSchema = z.object({
 });
 
 // Create promo code
-router.post("/", async (req, res) => {
+router.post(
+  "/",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
   try {
     const parsed = promoSchema.safeParse(req.body);
 
@@ -55,7 +60,11 @@ router.post("/", async (req, res) => {
 });
 
 // List promo codes
-router.get("/", async (req, res) => {
+router.get(
+  "/",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
   try {
     const promos = await prisma.promoCode.findMany({
       orderBy: { createdAt: "desc" },

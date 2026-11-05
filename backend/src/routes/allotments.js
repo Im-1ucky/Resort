@@ -1,6 +1,7 @@
 import express from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
+import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -14,7 +15,11 @@ const querySchema = z.object({
   { message: "Start date must be before or equal to end date" }
 );
 
-router.get("/", async (req, res) => {
+router.get(
+  "/",
+  authenticate,
+  authorize("ADMIN", "RESERVATIONS", "GM"),
+  async (req, res) => {
   const result = querySchema.safeParse(req.query);
 
   if (!result.success) {
@@ -78,7 +83,11 @@ const updateSchema = z.object({
   allottedUnits: z.number().int().min(0).max(1000),
 });
 
-router.put("/", async (req, res) => {
+router.put(
+  "/",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
   const result = updateSchema.safeParse(req.body);
 
   if (!result.success) {

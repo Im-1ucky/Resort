@@ -107,6 +107,12 @@ const simulatePaymentSchema = z.object({
 });
 
 router.post("/payments/:id/simulate", async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).json({
+      success: false,
+      message: "Payment simulation is disabled",
+    });
+  }
   const result = simulatePaymentSchema.safeParse(req.body);
 
   if (!result.success) {

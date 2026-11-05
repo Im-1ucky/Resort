@@ -10,6 +10,8 @@ import allotmentRoutes from "./src/routes/allotments.js";
 import blackoutRoutes from "./src/routes/blackouts.js";
 import promoRoutes from "./src/routes/promos.js";
 import { expirePendingBookings } from "./src/services/bookingExpiry.js";
+import cookieParser from "cookie-parser";
+import authRoutes from "./src/routes/auth.js";
 
 dotenv.config();
 
@@ -25,6 +27,8 @@ app.use(cors({
 //Middlewares
 
 app.use(express.json());
+
+app.use(cookieParser());
 
 
 //Routers
@@ -44,6 +48,8 @@ app.use("/api/allotments", allotmentRoutes);
 app.use("/api/blackouts", blackoutRoutes);
 
 app.use("/api/promos", promoRoutes);
+
+app.use("/api/auth", authRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

@@ -2,6 +2,7 @@
 import express from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
+import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -74,7 +75,11 @@ const createRateSchema = z.object({
   effectiveDate: z.iso.date(),
 });
 
-router.post("/", async (req, res) => {
+router.post(
+  "/",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
   const result = createRateSchema.safeParse(req.body);
 
   if (!result.success) {

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
+import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -8,7 +9,11 @@ const dateSchema = z.iso.date();
 
 // GET /api/blackouts
 // Optional filters: startDate, endDate, roomTypeId
-router.get("/", async (req, res) => {
+router.get(
+  "/",
+  authenticate,
+  authorize("ADMIN", "RESERVATIONS", "GM"),
+  async (req, res) => {
   try {
     const querySchema = z.object({
       startDate: dateSchema.optional(),
@@ -77,7 +82,11 @@ router.get("/", async (req, res) => {
 
 // POST /api/blackouts
 // roomTypeId omitted or null = property-wide blackout
-router.post("/", async (req, res) => {
+router.post(
+  "/",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
   try {
     const bodySchema = z.object({
       date: dateSchema,
@@ -154,7 +163,11 @@ router.post("/", async (req, res) => {
 });
 
 // DELETE /api/blackouts/:id
-router.delete("/:id", async (req, res) => {
+router.delete(
+  "/:id",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
   try {
     const idSchema = z.uuid();
     const parsed = idSchema.safeParse(req.params.id);

@@ -529,17 +529,6 @@ router.post("/", async (req, res) => {
               roomType: true,
             },
           },
-
-          // Return assigned room numbers in the response.
-          roomAssignments: {
-            include: {
-              room: {
-                include: {
-                  roomType: true,
-                },
-              },
-            },
-          },
         },
       });
 
