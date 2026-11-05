@@ -268,9 +268,16 @@ router.post("/payments/:id/simulate", async (req, res) => {
       };
     });
 
+    const { booking, ...safeOutcome } = outcome;
+
+    const safeBooking = booking
+      ? (({ cancellationTokenHash, ...data }) => data)(booking)
+      : undefined;
+
     return res.status(outcome.status).json({
       success: outcome.status < 400,
-      ...outcome,
+      ...safeOutcome,
+      ...(booking ? { booking: safeBooking } : {}),
     });
   } catch (error) {
     console.error("Payment processing failed:", error);
