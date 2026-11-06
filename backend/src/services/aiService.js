@@ -30,10 +30,40 @@ const AIResultSchema = z.object({
   }),
 });
 
+export function validateClassification(data) {
+  return AIResultSchema.safeParse(data);
+}
+
 // Reply generation response schema
 const AIReplySchema = z.object({
   draft: z.string().trim().min(1),
 });
+
+export function validateReply(data) {
+  return AIReplySchema.safeParse(data);
+}
+
+export function routeClassification(data) {
+  // Complaints always reach GM. Other low-confidence enquiries go to UNSORTED.
+  let department = "UNSORTED";
+
+  if (data.category === "COMPLAINT") {
+    department = "GM";
+  } else if (data.confidence >= 0.75) {
+    switch (data.category) {
+      case "ROOM_BOOKING":
+        department = "RESERVATIONS";
+        break;
+
+      case "WEDDING_EVENT":
+      case "CORPORATE_OFFSITE":
+        department = "SALES";
+        break;
+    }
+  }
+
+  return department;
+}
 
 // 1. ENQUIRY CLASSIFICATION
 
@@ -139,23 +169,7 @@ Return only valid JSON. No Markdown or code fences.
 
   const data = result.data;
 
-  // Complaints always reach GM. Other low-confidence enquiries go to UNSORTED.
-  let department = "UNSORTED";
-
-  if (data.category === "COMPLAINT") {
-    department = "GM";
-  } else if (data.confidence >= 0.75) {
-    switch (data.category) {
-      case "ROOM_BOOKING":
-        department = "RESERVATIONS";
-        break;
-
-      case "WEDDING_EVENT":
-      case "CORPORATE_OFFSITE":
-        department = "SALES";
-        break;
-    }
-  }
+  const department = routeClassification(data);
 
   return {
     ...data,
@@ -163,9 +177,7 @@ Return only valid JSON. No Markdown or code fences.
   };
 }
 
-// --------------------------------------------------
 // 2. AI REPLY DRAFT GENERATION
-// --------------------------------------------------
 
 export async function generateReplyDraft(enquiry) {
   if (!process.env.GEMINI_API_KEY || !model) {

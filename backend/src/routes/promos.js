@@ -1,9 +1,22 @@
+
 import express from "express";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
+
+const promoValidationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many promo validation attempts. Please try again later.",
+  },
+});
 
 const promoSchema = z.object({
   code: z.string().trim().min(3).max(30).transform((v) => v.toUpperCase()),
@@ -29,35 +42,43 @@ router.post(
   authenticate,
   authorize("ADMIN"),
   async (req, res) => {
-  try {
-    const parsed = promoSchema.safeParse(req.body);
+    try {
+      const parsed = promoSchema.safeParse(req.body);
 
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Invalid promo code details",
-        errors: parsed.error.issues,
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid promo code details",
+          errors: parsed.error.issues,
+        });
+      }
+
+      const promo = await prisma.promoCode.create({
+        data: parsed.data,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Promo code created successfully",
+        promo,
+      });
+    } catch (error) {
+      if (error.code === "P2002") {
+        return res.status(409).json({
+          success: false,
+          message: "Promo code already exists",
+        });
+      }
+
+      console.error("Create promo error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
       });
     }
-
-    const promo = await prisma.promoCode.create({
-      data: parsed.data,
-    });
-
-    return res.status(201).json({
-      message: "Promo code created successfully",
-      promo,
-    });
-  } catch (error) {
-    if (error.code === "P2002") {
-      return res.status(409).json({
-        message: "Promo code already exists",
-      });
-    }
-
-    console.error(error);
-    return res.status(500).json({ message: "Internal server error" });
   }
-});
+);
 
 // List promo codes
 router.get(
@@ -65,80 +86,100 @@ router.get(
   authenticate,
   authorize("ADMIN"),
   async (req, res) => {
-  try {
-    const promos = await prisma.promoCode.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    try {
+      const promos = await prisma.promoCode.findMany({
+        orderBy: { createdAt: "desc" },
+      });
 
-    return res.json({ promos });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal server error" });
+      return res.json({
+        success: true,
+        promos,
+      });
+    } catch (error) {
+      console.error("List promos error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
   }
-});
+);
 
 // Validate promo code
-router.post("/validate", async (req, res) => {
-  try {
-    const schema = z.object({
-      code: z.string().trim().min(1),
-      bookingAmount: z.number().positive(),
-    });
+router.post(
+  "/validate",
+  promoValidationLimiter,
+  async (req, res) => {
+    try {
+      const schema = z.object({
+        code: z.string().trim().min(1).max(30),
+        bookingAmount: z.number().positive().finite(),
+      });
 
-    const parsed = schema.safeParse(req.body);
+      const parsed = schema.safeParse(req.body);
 
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Invalid validation details",
-        errors: parsed.error.issues,
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid validation details",
+          errors: parsed.error.issues,
+        });
+      }
+
+      const { code, bookingAmount } = parsed.data;
+
+      const promo = await prisma.promoCode.findUnique({
+        where: { code: code.toUpperCase() },
+      });
+
+      const invalidResponse = () =>
+        res.status(400).json({
+          success: false,
+          message: "This promo code cannot be applied",
+        });
+
+      if (!promo || !promo.isActive) {
+        return invalidResponse();
+      }
+
+      const now = new Date();
+
+      if (now < promo.startsAt || now > promo.expiresAt) {
+        return invalidResponse();
+      }
+
+      if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) {
+        return invalidResponse();
+      }
+
+      if (bookingAmount < Number(promo.minBookingAmount)) {
+        return invalidResponse();
+      }
+
+      const discount =
+        promo.discountType === "PERCENTAGE"
+          ? (bookingAmount * Number(promo.discountValue)) / 100
+          : Number(promo.discountValue);
+
+      const finalDiscount = Math.min(discount, bookingAmount);
+
+      return res.json({
+        success: true,
+        message: "Promo code applied successfully",
+        code: promo.code,
+        discount: finalDiscount,
+        finalAmount: bookingAmount - finalDiscount,
+      });
+    } catch (error) {
+      console.error("Validate promo error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
       });
     }
-
-    const { code, bookingAmount } = parsed.data;
-
-    const promo = await prisma.promoCode.findUnique({
-      where: { code: code.toUpperCase() },
-    });
-
-    if (!promo || !promo.isActive) {
-      return res.status(404).json({ message: "Invalid promo code" });
-    }
-
-    const now = new Date();
-
-    if (now < promo.startsAt || now > promo.expiresAt) {
-      return res.status(400).json({
-        message: "Promo code is not currently valid",
-      });
-    }
-
-    if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) {
-      return res.status(400).json({
-        message: "Promo code usage limit reached",
-      });
-    }
-
-    if (bookingAmount < Number(promo.minBookingAmount)) {
-      return res.status(400).json({
-        message: `Minimum booking amount is ₹${promo.minBookingAmount}`,
-      });
-    }
-
-    const discount =
-      promo.discountType === "PERCENTAGE"
-        ? (bookingAmount * Number(promo.discountValue)) / 100
-        : Number(promo.discountValue);
-
-    return res.json({
-      message: "Promo code applied successfully",
-      code: promo.code,
-      discount: Math.min(discount, bookingAmount),
-      finalAmount: Math.max(0, bookingAmount - discount),
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal server error" });
   }
-});
+);
 
 export default router;

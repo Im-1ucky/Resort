@@ -1,6 +1,7 @@
 import express from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
+import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -106,12 +107,17 @@ const simulatePaymentSchema = z.object({
   outcome: z.enum(["SUCCESS", "FAILED"]),
 });
 
-router.post("/payments/:id/simulate", async (req, res) => {
-  if (process.env.NODE_ENV === "production") {
-    return res.status(404).json({
-      success: false,
-      message: "Payment simulation is disabled",
-    });
+router.post(
+  "/payments/:id/simulate",
+  authenticate,
+  authorize("ADMIN", "DEV"),
+  async (req, res) => {
+    if (process.env.NODE_ENV === "production") {
+      return res.status(404).json({
+        success: false,
+        message: "Payment simulation is disabled",
+      }
+    );
   }
   const result = simulatePaymentSchema.safeParse(req.body);
 

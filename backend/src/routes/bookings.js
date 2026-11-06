@@ -3,8 +3,21 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import crypto from "node:crypto";
+import rateLimit from "express-rate-limit";
 
 const router = express.Router();
+
+const bookingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: {
+    success: false,
+    message: "Too many booking attempts. Please try again later.",
+  },
+});
 
 const bookingSchema = z
   .object({
@@ -51,7 +64,7 @@ const bookingSchema = z
     }
   );
 
-router.post("/", async (req, res) => {
+router.post("/", bookingLimiter, async (req, res) => {
   const result = bookingSchema.safeParse(req.body);
 
   if (!result.success) {
@@ -330,16 +343,44 @@ router.post("/", async (req, res) => {
       }
 
       // Fetch STANDARD rates for the selected categories.
-      const rates = await tx.dailyRate.findMany({
-        where: {
-          roomTypeId: { in: roomTypeIds },
-          ratePlan: { name: "STANDARD" },
-          date: { lt: endDate },
-        },
-        orderBy: {
-          date: "asc",
-        },
-      });
+      const [previousRates, ratesInRange] = await Promise.all([
+        // Get the latest rate before check-in for each room category.
+        Promise.all(
+          roomTypeIds.map((roomTypeId) =>
+            tx.dailyRate.findFirst({
+              where: {
+                roomTypeId,
+                ratePlan: { name: "STANDARD" },
+                date: { lt: startDate },
+              },
+              orderBy: {
+                date: "desc",
+              },
+            })
+          )
+        ),
+
+        // Get all rate changes during the booking period.
+        tx.dailyRate.findMany({
+          where: {
+            roomTypeId: { in: roomTypeIds },
+            ratePlan: { name: "STANDARD" },
+            date: {
+              gte: startDate,
+              lt: endDate,
+            },
+          },
+          orderBy: {
+            date: "asc",
+          },
+        }),
+      ]);
+
+      // Combine and sort rates chronologically for effective-from pricing.
+      const rates = [...previousRates, ...ratesInRange]
+        .filter(Boolean)
+        .sort((a, b) => a.date.getTime() - b.date.getTime());
+
 
       const itemPrices = [];
 
@@ -577,7 +618,7 @@ router.post("/", async (req, res) => {
 });
 
 // CANCEL BOOKING
-router.post("/:id/cancel", async (req, res) => {
+router.post("/:id/cancel", bookingLimiter, async (req, res) => {
   try {
     const idResult = z.string().uuid().safeParse(req.params.id);
 
@@ -653,9 +694,14 @@ router.post("/:id/cancel", async (req, res) => {
         .update(cancellationToken)
         .digest("hex");
 
+      const suppliedBuffer = Buffer.from(suppliedHash, "hex");
+      const storedBuffer = booking.cancellationTokenHash
+        ? Buffer.from(booking.cancellationTokenHash, "hex")
+        : Buffer.alloc(0);
+
       if (
-        !booking.cancellationTokenHash ||
-        suppliedHash !== booking.cancellationTokenHash
+        suppliedBuffer.length !== storedBuffer.length ||
+        !crypto.timingSafeEqual(suppliedBuffer, storedBuffer)
       ) {
         return res.status(403).json({
           success: false,

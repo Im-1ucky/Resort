@@ -1,3 +1,4 @@
+
 import prisma from "../src/lib/prisma.js";
 
 async function main() {
@@ -24,16 +25,44 @@ async function main() {
     create: { name: "STANDARD" },
   });
 
-  // 3. Get demo room categories
+  // 3. Get seeded room categories
   const seededRoomTypes = await prisma.roomType.findMany({
     where: { name: { in: ["ROOM", "VILLA"] } },
   });
 
-  // 4. Seed today's demo rates
+  const roomTypeMap = Object.fromEntries(
+    seededRoomTypes.map((type) => [type.name, type.id])
+  );
+
+  if (!roomTypeMap.ROOM || !roomTypeMap.VILLA) {
+    throw new Error("ROOM or VILLA room type missing");
+  }
+
+  // 4. Synchronize category inventory with existing physical rooms
+  for (const roomType of seededRoomTypes) {
+    const totalUnits = await prisma.room.count({
+      where: {
+        roomTypeId: roomType.id,
+        isRetired: false,
+      },
+    });
+
+    await prisma.roomType.update({
+      where: { id: roomType.id },
+      data: { totalUnits },
+    });
+  }
+
+  console.log("Physical inventory synchronized successfully!");
+
+  // 5. Seed today's demo rates
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
-  const defaultRates = { ROOM: 5000, VILLA: 10000 };
+  const defaultRates = {
+    ROOM: 5000,
+    VILLA: 10000,
+  };
 
   for (const roomType of seededRoomTypes) {
     await prisma.dailyRate.upsert({
@@ -57,7 +86,7 @@ async function main() {
 
   console.log("Demo rates seeded successfully!");
 
-  // 5. Seed assignment sample enquiries
+  // 6. Seed assignment sample enquiries
   const sampleEnquiries = [
     {
       externalMessageId: "ENQ-4410",
@@ -96,7 +125,9 @@ async function main() {
 
   for (const sample of sampleEnquiries) {
     const existingMessage = await prisma.enquiryMessage.findUnique({
-      where: { externalMessageId: sample.externalMessageId },
+      where: {
+        externalMessageId: sample.externalMessageId,
+      },
     });
 
     if (existingMessage) continue;

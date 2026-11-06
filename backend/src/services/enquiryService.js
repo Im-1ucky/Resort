@@ -1,5 +1,26 @@
 import prisma from "../lib/prisma.js";
 
+async function recoverDuplicateMessage(error, externalMessageId) {
+  if (error?.code !== "P2002" || !externalMessageId) {
+    throw error;
+  }
+
+  const existingMessage = await prisma.enquiryMessage.findUnique({
+    where: { externalMessageId },
+    include: { enquiry: true },
+  });
+
+  if (!existingMessage) {
+    throw error;
+  }
+
+  return {
+    duplicate: true,
+    enquiry: existingMessage.enquiry,
+    message: existingMessage,
+  };
+}
+
 export async function createEnquiry({
   guestName,
   guestEmail,
@@ -16,7 +37,8 @@ export async function createEnquiry({
   eventGuestCount,
   eventBudget,
 }) {
-  return prisma.$transaction(async (tx) => {
+  try {
+    return await prisma.$transaction(async (tx) => {
     if (externalMessageId) {
       const existingMessage = await tx.enquiryMessage.findUnique({
         where: { externalMessageId },
@@ -69,7 +91,10 @@ export async function createEnquiry({
       enquiry,
       message: enquiry.messages[0],
     };
-  });
+    });
+  } catch (error) {
+    return recoverDuplicateMessage(error, externalMessageId);
+  }
 }
 
 export async function appendEnquiryMessage({
@@ -78,7 +103,8 @@ export async function appendEnquiryMessage({
   source,
   externalMessageId,
 }) {
-  return prisma.$transaction(async (tx) => {
+  try {
+    return await prisma.$transaction(async (tx) => {
     if (externalMessageId) {
       const existingMessage = await tx.enquiryMessage.findUnique({
         where: { externalMessageId },
@@ -121,7 +147,9 @@ export async function appendEnquiryMessage({
       where: { id: enquiryId },
       data: {
         lastMessageAt: now,
-        status: "NEW",
+        status: ["RESOLVED", "CLOSED"].includes(enquiry.status)
+          ? "NEW"
+          : enquiry.status,
       },
     });
 
@@ -130,7 +158,10 @@ export async function appendEnquiryMessage({
       enquiry: updatedEnquiry,
       message,
     };
-  });
+    });
+  } catch (error) {
+    return recoverDuplicateMessage(error, externalMessageId);
+  }
 }
 
 
