@@ -2,7 +2,7 @@
 import { test, expect, afterAll } from "bun:test";
 import prisma from "../src/lib/prisma.js";
 
-const API_URL = "http://localhost:3000/api/bookings";
+const API_URL = "http://localhost:5000/api/bookings";
 
 const checkIn = "2026-11-20";
 const checkOut = "2026-11-22";

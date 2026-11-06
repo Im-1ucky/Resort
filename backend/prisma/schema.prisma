@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -382,4 +383,32 @@ model EnquiryStatusHistory {
   createdAt DateTime @default(now())
 
   @@index([enquiryId, createdAt])
+}
+
+model GuestOtpChallenge {
+  id         String    @id @default(uuid())
+  identifier String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([identifier, createdAt])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String
+  actorRole String
+  action    String
+  resource  String
+  filters   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
 }

@@ -4,8 +4,23 @@ import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import crypto from "node:crypto";
 import rateLimit from "express-rate-limit";
+import jwt from "jsonwebtoken";
 
 const router = express.Router();
+
+async function recordAudit(req, action, filters = {}) {
+  await prisma.auditLog.create({
+    data: {
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      action,
+      resource: "BOOKING",
+      filters,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") || null,
+    },
+  });
+}
 
 const bookingLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -631,84 +646,122 @@ router.post("/:id/cancel", bookingLimiter, async (req, res) => {
 
     const { cancellationToken } = req.body ?? {};
 
-    const isStaff = Boolean(req.cookies?.token);
-    let staffUser = null;
+        // Authenticate staff if a session cookie is supplied.
+        let staffUser = null;
 
-    // Authenticate staff if a session cookie is supplied.
-    if (isStaff) {
-      const jwt = await import("jsonwebtoken");
+        if (req.cookies?.token) {
+          try {
+            const decoded = jwt.verify(
+              req.cookies.token,
+              process.env.JWT_SECRET
+            );
 
-      try {
-        const decoded = jwt.default.verify(
-          req.cookies.token,
-          process.env.JWT_SECRET
+            staffUser = await prisma.user.findUnique({
+              where: { id: decoded.userId },
+              select: { id: true, role: true },
+            });
+          } catch {
+            staffUser = null;
+          }
+        }
+
+        const allowedStaffRoles = [
+          "ADMIN",
+          "RESERVATIONS",
+          "GM",
+          "DEV",
+        ];
+
+        const isAuthorizedStaff =
+          staffUser && allowedStaffRoles.includes(staffUser.role);
+
+        // Verify optional guest access token.
+        let guestIdentifier = null;
+        const authorization = req.headers.authorization || "";
+
+        if (authorization.startsWith("Bearer ")) {
+          try {
+            const decoded = jwt.verify(
+              authorization.slice(7),
+              process.env.JWT_SECRET,
+              { issuer: "resort-api" }
+            );
+
+            if (
+              decoded.scope === "guest-bookings" &&
+              typeof decoded.identifier === "string"
+            ) {
+              guestIdentifier = decoded.identifier;
+            }
+          } catch {
+            guestIdentifier = null;
+          }
+        }
+
+        const booking = await prisma.booking.findUnique({
+          where: { id: idResult.data },
+          select: {
+            id: true,
+            status: true,
+            guestEmail: true,
+            guestPhone: true,
+            cancellationTokenHash: true,
+            promoCodeId: true,
+          },
+        });
+
+        if (!booking) {
+          return res.status(404).json({
+            success: false,
+            message: "Booking not found",
+          });
+        }
+
+        // Guest JWT must match this booking's registered contact.
+        const isVerifiedGuest = guestIdentifier && (
+          (
+            guestIdentifier.includes("@") &&
+            guestIdentifier.toLowerCase() === booking.guestEmail.toLowerCase()
+          ) ||
+          (
+            !guestIdentifier.includes("@") &&
+            guestIdentifier === booking.guestPhone
+          )
         );
 
-        staffUser = await prisma.user.findUnique({
-          where: { id: decoded.userId },
-          select: { id: true, role: true },
-        });
-      } catch {
-        staffUser = null;
-      }
-    }
+        // Legacy cancellation token remains supported.
+        let hasValidCancellationToken = false;
 
-    const allowedStaffRoles = [
-      "ADMIN",
-      "RESERVATIONS",
-      "GM",
-      "DEV",
-    ];
+        if (
+          typeof cancellationToken === "string" &&
+          booking.cancellationTokenHash
+        ) {
+          const suppliedHash = crypto
+            .createHash("sha256")
+            .update(cancellationToken)
+            .digest("hex");
 
-    const isAuthorizedStaff =
-      staffUser && allowedStaffRoles.includes(staffUser.role);
+          const suppliedBuffer = Buffer.from(suppliedHash, "hex");
+          const storedBuffer = Buffer.from(
+            booking.cancellationTokenHash,
+            "hex"
+          );
 
-    if (!isAuthorizedStaff && typeof cancellationToken !== "string") {
-      return res.status(401).json({
-        success: false,
-        message: "Valid cancellation token or staff login required",
-      });
-    }
+          hasValidCancellationToken =
+            suppliedBuffer.length === storedBuffer.length &&
+            crypto.timingSafeEqual(suppliedBuffer, storedBuffer);
+        }
 
-    const booking = await prisma.booking.findUnique({
-      where: { id: idResult.data },
-      select: {
-        id: true,
-        status: true,
-        cancellationTokenHash: true,
-        promoCodeId: true,
-      },
-    });
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found",
-      });
-    }
-
-    // Guests must prove ownership using their private token.
-    if (!isAuthorizedStaff) {
-      const suppliedHash = crypto
-        .createHash("sha256")
-        .update(cancellationToken)
-        .digest("hex");
-
-      const suppliedBuffer = Buffer.from(suppliedHash, "hex");
-      const storedBuffer = booking.cancellationTokenHash
-        ? Buffer.from(booking.cancellationTokenHash, "hex")
-        : Buffer.alloc(0);
-
-      if (
-        suppliedBuffer.length !== storedBuffer.length ||
-        !crypto.timingSafeEqual(suppliedBuffer, storedBuffer)
-      ) {
-        return res.status(403).json({
-          success: false,
-          message: "Invalid cancellation token",
-        });
-      }
-    }
+        if (
+          !isAuthorizedStaff &&
+          !isVerifiedGuest &&
+          !hasValidCancellationToken
+        ) {
+          return res.status(401).json({
+            success: false,
+            message: "Valid guest verification, cancellation token, or staff login required",
+          });
+        }
 
     if (!["PENDING_PAYMENT", "CONFIRMED"].includes(booking.status)) {
       return res.status(409).json({
@@ -861,6 +914,14 @@ router.get(
         ({ cancellationTokenHash, ...booking }) => booking
       );
 
+      await recordAudit(req, "BOOKING_LIST_VIEW", {
+        searchUsed: Boolean(search),
+        status: status || null,
+        checkIn: checkIn || null,
+        page,
+        limit,
+      });
+
       return res.json({
         success: true,
         bookings: safeBookings,
@@ -919,6 +980,18 @@ router.get(
         return res.status(400).json({
           success: false,
           message: "'from' date cannot be after 'to' date",
+        });
+      }
+
+      const rangeDays =
+        (Date.parse(`${to}T00:00:00Z`) -
+          Date.parse(`${from}T00:00:00Z`)) /
+        (24 * 60 * 60 * 1000);
+
+      if (rangeDays > 365) {
+        return res.status(400).json({
+          success: false,
+          message: "CSV export range cannot exceed 366 days",
         });
       }
 
@@ -1060,6 +1133,12 @@ router.get(
         headers.map(csvCell).join(","),
         ...rows.map((row) => row.map(csvCell).join(",")),
       ].join("\r\n");
+
+      await recordAudit(req, "BOOKING_CSV_EXPORT", {
+        from,
+        to,
+        recordCount: bookings.length,
+      });
 
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader(

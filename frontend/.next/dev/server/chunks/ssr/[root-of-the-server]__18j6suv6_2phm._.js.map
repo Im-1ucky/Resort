@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 10, "column": 0}, "map": {"version":3,"sources":["file:///home/luckyarch/Projects/resort-platform/frontend/src/app/page.jsx"],"sourcesContent":["import Home from \"@/pages/Home/Home\";\n\nexport default function Page() {\n  return <Home />;\n}\n"],"names":["Page","Home"],"mappings":";;;;;;;;;;;;AAEe,SAASA;IACtB,qBAAO,oOAACC;AACV"}}]
+}

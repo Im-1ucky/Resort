@@ -16,7 +16,7 @@ import roomTypeRoutes from "./src/routes/roomTypes.js";
 import enquiryRoutes from "./src/routes/enquiries.js";
 import enquiryInboxRoutes from "./src/routes/enquiryInbox.js";
 import analyticsRoutes from "./src/routes/analytics.js";
-
+import guestAccessRoutes from "./src/routes/guestAccess.js";
 import { expirePendingBookings } from "./src/services/bookingExpiry.js";
 
 dotenv.config();
@@ -58,6 +58,7 @@ app.use("/api/room-types", roomTypeRoutes);
 app.use("/api", enquiryRoutes);
 app.use("/api/enquiries", enquiryInboxRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/guest", guestAccessRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

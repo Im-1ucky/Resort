@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///home/luckyarch/Projects/resort-platform/frontend/src/app/layout.jsx"],"sourcesContent":["import \"./globals.css\";\n\nexport const metadata = {\n  title: \"The Estate | Coffee Estate Resort\",\n  description:\n    \"Experience a peaceful retreat surrounded by the coffee estates of Chikkamagaluru.\",\n};\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang=\"en\">\n      <body>{children}</body>\n    </html>\n  );\n}\n"],"names":["metadata","title","description","RootLayout","children","lang"],"mappings":";;;;;;;;;AAEO,MAAMA,WAAW;IACtBC,OAAO;IACPC,aACE;AACJ;AAEe,SAASC,WAAW,EAAEC,QAAQ,EAAE;IAC7C,qBACE,oOAAC;QAAKC,MAAK;kBACT,cAAA,oOAAC;sBAAMD;;;AAGb"}}]
+}
