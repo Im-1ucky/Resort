@@ -5,14 +5,21 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import { format, startOfDay, isSameDay } from "date-fns";
+import { useBooking } from "@/components/Booking/BookingProvider";
 
 export default function DateRangePicker({
   checkInName = "checkIn",
   checkOutName = "checkOut",
 }) {
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
+  const {
+    checkIn: startDate,
+    checkOut: endDate,
+    setCheckIn: setStartDate,
+    setCheckOut: setEndDate,
+  } = useBooking();
+
   const [month, setMonth] = useState(new Date());
+  const [numberOfMonths, setNumberOfMonths] = useState(1);
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -25,8 +32,22 @@ export default function DateRangePicker({
 
   useEffect(() => {
     setMounted(true);
+
+    const mediaQuery = window.matchMedia("(min-width: 640px)");
+
+    const updateMonths = () => {
+      setNumberOfMonths(mediaQuery.matches ? 2 : 1);
+    };
+
+    updateMonths();
+    mediaQuery.addEventListener("change", updateMonths);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateMonths);
+    };
   }, []);
 
+  // Position calendar above or below the booking bar.
   useEffect(() => {
     if (!open) return;
 
@@ -53,7 +74,7 @@ export default function DateRangePicker({
       const left = Math.max(
         16,
         Math.min(
-          rect.left,
+          rect.left + rect.width / 2 - popupWidth / 2,
           window.innerWidth - popupWidth - 16
         )
       );
@@ -70,8 +91,9 @@ export default function DateRangePicker({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open]);
+  }, [open, numberOfMonths]);
 
+  // Close on outside click or Escape.
   useEffect(() => {
     function handleOutsideClick(event) {
       const insideTrigger = pickerRef.current?.contains(event.target);
@@ -95,23 +117,12 @@ export default function DateRangePicker({
     };
   }, []);
 
-  function handleDateSelect(date) {
-    if (!date) return;
+  function handleDateSelect(range) {
+    const from = range?.from ?? null;
+    const to = range?.to ?? null;
 
-    if (!startDate || endDate) {
-      setStartDate(date);
-      setEndDate(null);
-      return;
-    }
-
-    if (isSameDay(date, startDate)) return;
-
-    if (date < startDate) {
-      setStartDate(date);
-      setEndDate(startDate);
-    } else {
-      setEndDate(date);
-    }
+    setStartDate(from);
+    setEndDate(from && to && isSameDay(from, to) ? null : to);
   }
 
   const dateLabel = (date) =>
@@ -119,7 +130,7 @@ export default function DateRangePicker({
 
   return (
     <div ref={pickerRef} className="relative w-full">
-      {/* Booking date display */}
+      {/* Check-in and check-out fields */}
       <button
         ref={triggerRef}
         type="button"
@@ -129,38 +140,43 @@ export default function DateRangePicker({
         className="grid w-full grid-cols-[1fr_auto_1fr_auto] items-center gap-3 text-left"
       >
         <div className="min-w-0">
-          <span className="mb-2 block text-[10px] font-medium tracking-[0.12em] text-wood">
+          <span className="mb-1 block text-[10px] font-semibold tracking-[0.12em] text-wood">
             CHECK IN
           </span>
-          <span className={`block truncate border-b py-2 text-sm ${
-            startDate
-              ? "border-forest/20 text-forest"
-              : "border-forest/20 text-forest/45"
-          }`}>
+
+          <span
+            className={`block truncate border-b py-1 text-sm ${
+              startDate
+                ? "border-forest/20 text-forest"
+                : "border-forest/20 text-forest/45"
+            }`}
+          >
             {dateLabel(startDate)}
           </span>
         </div>
 
-        <span className="mt-6 text-wood">→</span>
+        <span className="mt-5 text-wood">→</span>
 
         <div className="min-w-0">
-          <span className="mb-2 block text-[10px] font-medium tracking-[0.12em] text-wood">
+          <span className="mb-1 block text-[10px] font-semibold tracking-[0.12em] text-wood">
             CHECK OUT
           </span>
-          <span className={`block truncate border-b py-2 text-sm ${
-            endDate
-              ? "border-forest/20 text-forest"
-              : "border-forest/20 text-forest/45"
-          }`}>
+
+          <span
+            className={`block truncate border-b py-1 text-sm ${
+              endDate
+                ? "border-forest/20 text-forest"
+                : "border-forest/20 text-forest/45"
+            }`}
+          >
             {dateLabel(endDate)}
           </span>
         </div>
-
-        <span className="mt-6 text-forest/60">▦</span>
       </button>
 
-      {/* Calendar rendered outside the Hero section */}
-      {open && mounted &&
+      {/* Calendar popup */}
+      {open &&
+        mounted &&
         createPortal(
           <div
             ref={popupRef}
@@ -171,114 +187,74 @@ export default function DateRangePicker({
               zIndex: 9999,
               visibility: position.top ? "visible" : "hidden",
             }}
-            className="w-[min(340px,calc(100vw-32px))] rounded-xl border border-forest/10 bg-[#f7f4ed] p-4 text-forest shadow-2xl sm:p-5"
+            className="relative w-[min(340px,calc(100vw-32px))] rounded-xl border border-forest/10 bg-[#f7f4ed] p-5 text-forest shadow-2xl sm:w-[min(680px,calc(100vw-32px))] sm:p-6"
           >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="font-display text-lg text-forest">
-                  Choose your stay
-                </p>
-                <p className="mt-1 text-xs text-forest/60">
-                  Select any two dates
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setStartDate(null);
-                  setEndDate(null);
-                }}
-                className="text-xs text-wood transition hover:text-forest"
-              >
-                Clear
-              </button>
-            </div>
-
             <DayPicker
-              mode="single"
+              mode="range"
+              min={1}
               month={month}
               onMonthChange={setMonth}
+              selected={{
+                from: startDate ?? undefined,
+                to: endDate ?? undefined,
+              }}
               onSelect={handleDateSelect}
+              numberOfMonths={numberOfMonths}
+              pagedNavigation={numberOfMonths > 1}
               disabled={{ before: today }}
               showOutsideDays={false}
               modifiers={{
-                range_start: startDate,
-                range_end: endDate,
-                range_middle:
-                  startDate && endDate
-                    ? { from: startDate, to: endDate }
-                    : undefined,
+                singleCheckIn:
+                  startDate && !endDate ? startDate : undefined,
               }}
               modifiersClassNames={{
-                range_start:
-                  "!rounded-l-full !rounded-r-none !bg-forest !text-white",
-                range_end:
-                  "!rounded-r-full !rounded-l-none !bg-forest !text-white",
-                range_middle:
-                  "!rounded-none !bg-forest/10 !text-forest",
+                range_start: "booking-range-start",
+                range_end: "booking-range-end",
+                range_middle: "booking-range-middle",
+                singleCheckIn: "booking-single-check-in",
               }}
               classNames={{
-                root: "w-full",
-                months: "w-full",
-                month: "w-full",
-
+                root: `booking-calendar relative w-full ${
+                  startDate && !endDate ? "booking-calendar--selecting-end" : ""
+                }`,
+                months: "flex flex-col gap-6 sm:flex-row sm:gap-8",
+                month: "w-full flex-1",
                 month_caption:
-                  "relative mb-2 flex h-7 items-center justify-center",
-
-                caption_label:
-                  "font-medium text-sm text-forest",
-
+                  "relative mb-3 flex h-9 items-center justify-center",
+                caption_label: "font-semibold text-sm text-forest",
                 nav:
-                  "absolute inset-x-0 top-0 flex items-center justify-between",
-
+                  "absolute inset-x-0 top-0 z-10 flex h-9 items-center justify-between px-1",
                 button_previous:
-                  "flex h-7 w-7 items-center justify-center rounded-full text-forest hover:bg-forest/10",
-
+                  "flex h-9 w-9 items-center justify-center rounded-full text-forest transition hover:bg-forest/10",
                 button_next:
-                  "flex h-7 w-7 items-center justify-center rounded-full text-forest hover:bg-forest/10",
-
-                month_grid:
-                  "w-full border-collapse",
-
-                weekdays:
-                  "flex",
-
+                  "flex h-9 w-9 items-center justify-center rounded-full text-forest transition hover:bg-forest/10",
+                month_grid: "w-full border-collapse",
+                weekdays: "flex",
                 weekday:
-                  "flex-1 py-1.5 text-center text-[9px] font-medium uppercase text-wood",
-
-                week:
-                  "mt-0.5 flex w-full",
-
-                day:
-                  "flex-1 text-center",
-
+                  "flex-1 py-2 text-center text-[10px] font-medium uppercase text-wood",
+                week: "mt-1 flex w-full",
+                day: "flex-1 text-center",
                 day_button:
-                  "mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs text-forest transition hover:bg-forest/10 focus-visible:outline-2 focus-visible:outline-wood",
-
+                  "mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm text-forest transition hover:bg-forest/10 focus-visible:outline-2 focus-visible:outline-wood",
                 today:
                   "font-bold underline decoration-wood underline-offset-4",
-
-                disabled:
-                  "cursor-not-allowed !text-forest/20",
-
-                outside:
-                  "invisible",
-
-                hidden:
-                  "invisible",
+                disabled: "cursor-not-allowed !text-forest/20",
+                outside: "invisible",
+                hidden: "invisible",
               }}
             />
 
-            <div className="mt-4 border-t border-forest/10 pt-3">
-              <p className="text-center text-[11px] text-forest/60">
+            {/* Checkout reminder */}
+            <div className="mt-5 border-t border-forest/10 pt-4">
+              <p className="text-center text-xs text-forest/60">
                 {startDate && endDate
-                  ? `${Math.round(
-                      (endDate - startDate) / (1000 * 60 * 60 * 24)
-                    )} nights selected`
+                  ? `Please check out by the morning of ${format(
+                      endDate,
+                      "dd MMMM yyyy"
+                    )}.`
                   : startDate
-                    ? "Now select your other date"
-                    : "Choose your arrival and departure dates"}
+                    ? "Now select your departure date."
+                    : "Select your check-in and check-out dates."}
               </p>
             </div>
           </div>,

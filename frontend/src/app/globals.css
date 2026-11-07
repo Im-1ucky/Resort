@@ -65,3 +65,98 @@ a {
   color: var(--color-white);
   background: var(--color-forest);
 }
+
+
+/* Calendar date cells */
+.booking-calendar .booking-range-start,
+.booking-calendar .booking-range-middle,
+.booking-calendar .booking-range-end {
+  position: relative;
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* Range background — only after checkout is selected */
+.booking-calendar:not(.booking-calendar--selecting-end)
+  .booking-range-middle::before,
+.booking-calendar:not(.booking-calendar--selecting-end)
+  .booking-range-start::before,
+.booking-calendar:not(.booking-calendar--selecting-end)
+  .booking-range-end::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  height: 40px;
+  background: rgb(38 59 48 / 12%);
+  pointer-events: none;
+}
+
+.booking-calendar .booking-range-middle::before {
+  left: 0;
+  right: 0;
+}
+
+.booking-calendar .booking-range-start::before {
+  left: 50%;
+  right: 0;
+}
+
+.booking-calendar .booking-range-end::before {
+  left: 0;
+  right: 50%;
+}
+
+/* Check-in and checkout circles */
+.booking-calendar .booking-range-start > button,
+.booking-calendar .booking-range-end > button {
+  position: relative;
+  z-index: 1;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  background: #263b30 !important;
+  color: #fff !important;
+}
+
+.booking-calendar .booking-range-start > button:hover,
+.booking-calendar .booking-range-end > button:hover {
+  background: #1c2e25 !important;
+  color: #fff !important;
+}
+
+/* Dates between check-in and checkout */
+.booking-calendar .booking-range-middle > button {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  color: #263b30 !important;
+  border-radius: 0 !important;
+}
+
+/* Single check-in date — modifier may be on the td or button */
+.booking-calendar--selecting-end
+  td.booking-single-check-in > button,
+.booking-calendar--selecting-end
+  td:has(> .booking-single-check-in) > button,
+.booking-calendar--selecting-end
+  button.booking-single-check-in {
+  position: relative;
+  z-index: 2;
+  width: 40px !important;
+  height: 40px !important;
+  border: none !important;
+  border-radius: 50% !important;
+  background: #263b30 !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.booking-calendar--selecting-end
+  td.booking-single-check-in > button:hover,
+.booking-calendar--selecting-end
+  button.booking-single-check-in:hover {
+  background: #1c2e25 !important;
+  color: #fff !important;
+}
