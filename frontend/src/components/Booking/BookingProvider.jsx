@@ -1,12 +1,29 @@
+
 "use client";
 
 import { createContext, useContext, useState } from "react";
 
 const BookingContext = createContext(null);
 
+function getDefaultDates() {
+  const checkIn = new Date();
+
+  // Tomorrow at local midnight
+  checkIn.setHours(0, 0, 0, 0);
+  checkIn.setDate(checkIn.getDate() + 1);
+
+  // One night later
+  const checkOut = new Date(checkIn);
+  checkOut.setDate(checkOut.getDate() + 1);
+
+  return { checkIn, checkOut };
+}
+
 export function BookingProvider({ children }) {
-  const [checkIn, setCheckIn] = useState(null);
-  const [checkOut, setCheckOut] = useState(null);
+  const [defaultDates] = useState(getDefaultDates);
+
+  const [checkIn, setCheckIn] = useState(defaultDates.checkIn);
+  const [checkOut, setCheckOut] = useState(defaultDates.checkOut);
   const [adults, setAdults] = useState(2);
   const [childrenCount, setChildrenCount] = useState(0);
 

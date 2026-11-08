@@ -61,20 +61,46 @@ export default function RoomListing() {
   useEffect(() => {
     const queryCheckIn = searchParams.get("checkIn");
     const queryCheckOut = searchParams.get("checkOut");
-    const queryAdults = Number(searchParams.get("adults")) || 2;
-    const queryChildren = Number(searchParams.get("children")) || 0;
 
-    if (queryCheckIn) setCheckIn(parseISO(queryCheckIn));
-    if (queryCheckOut) setCheckOut(parseISO(queryCheckOut));
+    const start =
+      queryCheckIn ||
+      (checkIn ? format(checkIn, "yyyy-MM-dd") : "") ||
+      format(addDays(new Date(), 1), "yyyy-MM-dd");
+
+    const end =
+      queryCheckOut ||
+      (checkOut ? format(checkOut, "yyyy-MM-dd") : "") ||
+      format(addDays(new Date(), 2), "yyyy-MM-dd");
+
+    const queryAdults = searchParams.has("adults")
+      ? Number(searchParams.get("adults"))
+      : adults;
+
+    const queryChildren = searchParams.has("children")
+      ? Number(searchParams.get("children"))
+      : childrenCount;
+
+    if (
+      queryCheckIn &&
+      (!checkIn || format(checkIn, "yyyy-MM-dd") !== queryCheckIn)
+    ) {
+      setCheckIn(parseISO(queryCheckIn));
+    }
+
+    if (
+      queryCheckOut &&
+      (!checkOut || format(checkOut, "yyyy-MM-dd") !== queryCheckOut)
+    ) {
+      setCheckOut(parseISO(queryCheckOut));
+    }
+
+    let cancelled = false;
 
     async function loadAvailability() {
       setLoading(true);
       setError("");
 
       try {
-        const start = queryCheckIn || format(addDays(new Date(), 1), "yyyy-MM-dd");
-        const end = queryCheckOut || format(addDays(new Date(), 2), "yyyy-MM-dd");
-
         const params = new URLSearchParams({
           checkIn: start,
           checkOut: end,
@@ -84,16 +110,34 @@ export default function RoomListing() {
 
         const data = await apiFetch(`/availability?${params}`);
 
-        setRoomTypes(data.roomTypes || []);
+        if (!cancelled) {
+          setRoomTypes(data.roomTypes || []);
+        }
       } catch (err) {
-        setError(err.message);
+        if (!cancelled) {
+          setError(err.message || "Unable to load room availability.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     loadAvailability();
-  }, [searchParams, setCheckIn, setCheckOut]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    searchParams,
+    checkIn,
+    checkOut,
+    adults,
+    childrenCount,
+    setCheckIn,
+    setCheckOut,
+  ]);
 
   const start = checkIn || addDays(new Date(), 1);
   const end = checkOut || addDays(start, 1);

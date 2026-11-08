@@ -58,8 +58,13 @@ router.get("/", async (req, res) => {
     const roomTypeIds = suitableRoomTypes.map((type) => type.id);
 
     // Fetch inventory, bookings, blackouts and STANDARD rates.
-    const [allotments, bookings, blackouts, rates] =
-      await Promise.all([
+    const [
+      allotments,
+      bookings,
+      blackouts,
+      ratesInRange,
+      previousRates,
+    ] = await Promise.all([
         prisma.websiteAllotment.findMany({
           where: {
             roomTypeId: { in: roomTypeIds },
@@ -99,6 +104,7 @@ router.get("/", async (req, res) => {
           },
         }),
 
+        // Rates that become effective during the requested stay.
         prisma.dailyRate.findMany({
           where: {
             roomTypeId: { in: roomTypeIds },
@@ -113,7 +119,34 @@ router.get("/", async (req, res) => {
             price: true,
             gstRate: true,
           },
+          orderBy: {
+            date: "asc",
+          },
         }),
+
+        // Latest rate effective before check-in for each room category.
+        Promise.all(
+          suitableRoomTypes.map((roomType) =>
+            prisma.dailyRate.findFirst({
+              where: {
+                roomTypeId: roomType.id,
+                date: { lt: startDate },
+                ratePlan: {
+                  is: { name: "STANDARD" },
+                },
+              },
+              orderBy: {
+                date: "desc",
+              },
+              select: {
+                roomTypeId: true,
+                date: true,
+                price: true,
+                gstRate: true,
+              },
+            })
+          )
+        ),
       ]);
 
     // Do not advertise inventory if an existing active booking
@@ -138,16 +171,34 @@ router.get("/", async (req, res) => {
     // Index rates by room category and date for quick lookup.
     const rateMap = new Map();
 
-    for (const rate of rates) {
-      const dateKey = rate.date.toISOString().slice(0, 10);
-      rateMap.set(`${rate.roomTypeId}:${dateKey}`, rate);
+    const allRates = [
+      ...previousRates.filter(Boolean),
+      ...ratesInRange,
+    ];
+
+    for (const rate of allRates) {
+      if (!rateMap.has(rate.roomTypeId)) {
+        rateMap.set(rate.roomTypeId, []);
+      }
+
+      rateMap.get(rate.roomTypeId).push(rate);
+    }
+
+    // Ensure rates are ordered chronologically.
+    for (const roomRates of rateMap.values()) {
+      roomRates.sort((a, b) => a.date.getTime() - b.date.getTime());
     }
 
     // Calculate the price for one unit of a room category.
     const calculatePricing = (roomTypeId) => {
       let baseTotal = 0;
       let gstTotal = 0;
+
       const nightlyRates = [];
+      const roomRates = rateMap.get(roomTypeId) || [];
+
+      let rateIndex = 0;
+      let effectiveRate = null;
 
       for (
         let night = new Date(startDate);
@@ -155,19 +206,29 @@ router.get("/", async (req, res) => {
         night.setUTCDate(night.getUTCDate() + 1)
       ) {
         const dateKey = night.toISOString().slice(0, 10);
-        const rate = rateMap.get(`${roomTypeId}:${dateKey}`);
 
-        // Do not advertise an incomplete price.
-        if (!rate) {
+        // Find the latest rate effective on or before this night.
+        while (
+          rateIndex < roomRates.length &&
+          roomRates[rateIndex].date <= night
+        ) {
+          effectiveRate = roomRates[rateIndex];
+          rateIndex++;
+        }
+
+        // No rate has been configured for this night.
+        if (!effectiveRate) {
           return null;
         }
 
-        const basePrice = Number(rate.price);
-        const gstRate = Number(rate.gstRate);
+        const basePrice = Number(effectiveRate.price);
+        const gstRate = Number(effectiveRate.gstRate);
 
         const gstAmount = roundMoney(
           (basePrice * gstRate) / 100
         );
+
+        const nightlyTotal = roundMoney(basePrice + gstAmount);
 
         baseTotal += basePrice;
         gstTotal += gstAmount;
@@ -177,7 +238,7 @@ router.get("/", async (req, res) => {
           basePrice: roundMoney(basePrice),
           gstRate,
           gstAmount,
-          totalWithTax: roundMoney(basePrice + gstAmount),
+          totalWithTax: nightlyTotal,
         });
       }
 
