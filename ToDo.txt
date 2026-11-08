@@ -3,3 +3,4 @@ Backend
 
 Frontend
 1. Polish the booking bar animation
+2. Cancel booking

@@ -2,7 +2,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { format, addDays } from "date-fns";
+import { addDays } from "date-fns";
+import {
+  formatIndianDate,
+  parseIndianDate,
+  formatApiDate,
+} from "@/lib/date";
 import { useBooking } from "@/components/Booking/BookingProvider";
 import useEmblaCarousel from "embla-carousel-react";
 import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
@@ -253,6 +258,14 @@ export default function ExpandedRoomCard({ room, onClose }) {
   const [activeImage, setActiveImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
+  const [checkInInput, setCheckInInput] = useState(
+    formatIndianDate(checkIn)
+  );
+
+  const [checkOutInput, setCheckOutInput] = useState(
+    formatIndianDate(checkOut)
+  );
+
   const galleryRef = useRef(null);
 
   const images = useMemo(
@@ -261,6 +274,12 @@ export default function ExpandedRoomCard({ room, onClose }) {
   );
 
   const maxGuests = room?.maxGuests || 4;
+
+  // Keep displayed dates synchronized with booking state.
+  useEffect(() => {
+    setCheckInInput(formatIndianDate(checkIn));
+    setCheckOutInput(formatIndianDate(checkOut));
+  }, [checkIn, checkOut]);
 
   // Reset gallery when the selected room changes.
   useEffect(() => {
@@ -383,8 +402,8 @@ export default function ExpandedRoomCard({ room, onClose }) {
     const params = new URLSearchParams({
       roomTypeId: room.id,
       quantity: "1",
-      checkIn: format(checkIn, "yyyy-MM-dd"),
-      checkOut: format(checkOut, "yyyy-MM-dd"),
+      checkIn: formatApiDate(checkIn),
+      checkOut: formatApiDate(checkOut),
       adults: String(adults),
       children: String(childrenCount),
     });
@@ -591,11 +610,21 @@ export default function ExpandedRoomCard({ room, onClose }) {
                     </label>
 
                     <input
-                      type="date"
-                      value={format(checkIn, "yyyy-MM-dd")}
-                      onChange={(event) =>
-                        changeCheckIn(event.target.value)
-                      }
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="DD/MM/YYYY"
+                      maxLength={10}
+                      value={checkInInput}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setCheckInInput(value);
+
+                        const parsed = parseIndianDate(value);
+
+                        if (parsed) {
+                          changeCheckIn(formatApiDate(parsed));
+                        }
+                      }}
                       className={inputClass}
                     />
                   </div>
@@ -606,15 +635,21 @@ export default function ExpandedRoomCard({ room, onClose }) {
                     </label>
 
                     <input
-                      type="date"
-                      min={format(
-                        addDays(checkIn, 1),
-                        "yyyy-MM-dd"
-                      )}
-                      value={format(checkOut, "yyyy-MM-dd")}
-                      onChange={(event) =>
-                        changeCheckOut(event.target.value)
-                      }
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="DD/MM/YYYY"
+                      maxLength={10}
+                      value={checkOutInput}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setCheckOutInput(value);
+
+                        const parsed = parseIndianDate(value);
+
+                        if (parsed) {
+                          changeCheckOut(formatApiDate(parsed));
+                        }
+                      }}
                       className={inputClass}
                     />
                   </div>

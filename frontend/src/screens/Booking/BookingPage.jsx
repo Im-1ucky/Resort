@@ -4,6 +4,11 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import {
+  formatIndianDate,
+  parseIndianDate,
+  formatApiDate,
+} from "@/lib/date";
 
 export default function BookingPage() {
   const params = useSearchParams();
@@ -18,8 +23,8 @@ export default function BookingPage() {
     guestName: "",
     guestEmail: "",
     guestPhone: "",
-    checkIn: params.get("checkIn") || "",
-    checkOut: params.get("checkOut") || "",
+    checkIn: formatIndianDate(params.get("checkIn") || ""),
+    checkOut: formatIndianDate(params.get("checkOut") || ""),
     adults: Number(params.get("adults") || 2),
     children: Number(params.get("children") || 0),
     quantity: Number(params.get("quantity") || 1),
@@ -68,14 +73,27 @@ export default function BookingPage() {
       return;
     }
 
-    if (form.checkIn < new Date().toLocaleDateString("en-CA", {
+    const checkInDate = parseIndianDate(form.checkIn);
+    const checkOutDate = parseIndianDate(form.checkOut);
+
+    if (!checkInDate || !checkOutDate) {
+      setError("Enter valid dates in DD/MM/YYYY format.");
+      return;
+    }
+
+    const checkInISO = formatApiDate(checkInDate);
+    const checkOutISO = formatApiDate(checkOutDate);
+
+    const today = new Date().toLocaleDateString("en-CA", {
       timeZone: "Asia/Kolkata",
-    })) {
+    });
+
+    if (checkInISO < today) {
       setError("Check-in cannot be in the past.");
       return;
     }
 
-    if (form.checkOut <= form.checkIn) {
+    if (checkOutISO <= checkInISO) {
       setError("Check-out must be after check-in.");
       return;
     }
@@ -104,8 +122,8 @@ export default function BookingPage() {
           guestName: form.guestName.trim(),
           guestEmail: form.guestEmail.trim(),
           guestPhone: form.guestPhone.trim(),
-          checkIn: form.checkIn,
-          checkOut: form.checkOut,
+          checkIn: checkInISO,
+          checkOut: checkOutISO,
           adults: form.adults,
           children: form.children,
           promoCode: promoCode.trim() || undefined,
@@ -130,8 +148,8 @@ export default function BookingPage() {
         guestName: createdBooking.guestName,
         guestEmail: createdBooking.guestEmail,
         guestPhone: createdBooking.guestPhone,
-        checkIn: form.checkIn,
-        checkOut: form.checkOut,
+        checkIn: checkInISO,
+        checkOut: checkOutISO,
         adults: form.adults,
         children: form.children,
         quantity: form.quantity,
@@ -235,7 +253,10 @@ export default function BookingPage() {
                 Check-in
                 <input
                   required
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="DD/MM/YYYY"
+                  maxLength={10}
                   name="checkIn"
                   value={form.checkIn}
                   onChange={updateField}
@@ -247,9 +268,11 @@ export default function BookingPage() {
                 Check-out
                 <input
                   required
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="DD/MM/YYYY"
+                  maxLength={10}
                   name="checkOut"
-                  min={form.checkIn || undefined}
                   value={form.checkOut}
                   onChange={updateField}
                   className="mt-2 w-full rounded-lg border border-gray-300 p-3"

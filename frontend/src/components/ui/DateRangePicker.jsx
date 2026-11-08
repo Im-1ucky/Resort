@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -6,6 +5,7 @@ import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import { format, startOfDay, isSameDay } from "date-fns";
 import { useBooking } from "@/components/Booking/BookingProvider";
+import { formatIndianDate, formatApiDate } from "@/lib/date";
 
 export default function DateRangePicker({
   checkInName = "checkIn",
@@ -128,7 +128,9 @@ export default function DateRangePicker({
 
   const dateLabel = (date) =>
     date
-      ? format(date, compact ? "MMM d" : "dd/MM/yyyy")
+      ? compact
+        ? format(date, "MMM d")
+        : formatIndianDate(date)
       : compact
         ? "Add date"
         : "Select date";
@@ -275,9 +277,8 @@ export default function DateRangePicker({
             <div className="mt-5 border-t border-forest/10 pt-4">
               <p className="text-center text-xs text-forest/60">
                 {startDate && endDate
-                  ? `Please check out by the morning of ${format(
-                      endDate,
-                      "dd MMMM yyyy"
+                  ? `Please check out by the morning of ${formatIndianDate(
+                      endDate
                     )}.`
                   : startDate
                     ? "Now select your departure date."
@@ -292,13 +293,13 @@ export default function DateRangePicker({
       <input
         type="hidden"
         name={checkInName}
-        value={startDate ? format(startDate, "yyyy-MM-dd") : ""}
+        value={startDate ? formatApiDate(startDate) : ""}
       />
 
       <input
         type="hidden"
         name={checkOutName}
-        value={endDate ? format(endDate, "yyyy-MM-dd") : ""}
+        value={endDate ? formatApiDate(endDate) : ""}
       />
     </div>
   );

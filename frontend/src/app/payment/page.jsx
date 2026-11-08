@@ -1,9 +1,11 @@
+
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar/Navbar";
 import { apiFetch } from "@/lib/api";
+import { formatIndianDate } from "@/lib/date";
 
 function isValidCardNumber(value) {
   const digits = value.replace(/[\s-]/g, "");
@@ -417,11 +419,11 @@ function PaymentContent() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-gray-500">Check-in</p>
-                <p className="mt-1 font-medium">{booking.checkIn}</p>
+                <p className="mt-1 font-medium">{formatIndianDate(booking.checkIn)}</p>
               </div>
               <div>
                 <p className="text-gray-500">Check-out</p>
-                <p className="mt-1 font-medium">{booking.checkOut}</p>
+                <p className="mt-1 font-medium">{formatIndianDate(booking.checkOut)}</p>
               </div>
             </div>
 
@@ -444,9 +446,6 @@ function PaymentContent() {
               {booking.totalAmount != null
                 ? `₹${Number(booking.totalAmount).toLocaleString("en-IN")}`
                 : "Calculated at checkout"}
-            </p>
-            <p className="mt-2 text-xs text-gray-500">
-              Final amount is verified by the server.
             </p>
           </div>
         </aside>
