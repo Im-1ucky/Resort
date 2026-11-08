@@ -12,7 +12,10 @@
   },
   "dependencies": {
     "date-fns": "^4.4.0",
+    "embla-carousel-react": "^8.6.0",
+    "embla-carousel-wheel-gestures": "^8.1.0",
     "framer-motion": "^14.10.1",
+    "lucide-react": "^1.70.0",
     "motion": "^14.10.1",
     "next": "^16.4.5",
     "react": "^19.3.1",

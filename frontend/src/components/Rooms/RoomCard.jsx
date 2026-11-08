@@ -1,11 +1,12 @@
 
 "use client";
 
-function getVariant(room) {
-  const name = room.name.toUpperCase();
+import { useEffect, useMemo, useState } from "react";
 
-  if (name === "DELUXE VILLA") return "villa";
-  if (name === "VILLA") return "villa";
+function getVariant(room) {
+  const name = room.name?.toUpperCase();
+
+  if (name === "DELUXE VILLA" || name === "VILLA") return "villa";
   if (name === "DELUXE_TEST") return "deluxe";
 
   return "standard";
@@ -24,7 +25,7 @@ const variants = {
 };
 
 function getDisplayName(room) {
-  const name = room.name.toUpperCase();
+  const name = room.name?.toUpperCase();
 
   if (name === "ROOM") return "Standard Room";
   if (name === "DELUXE_TEST") return "Deluxe Room";
@@ -34,13 +35,53 @@ function getDisplayName(room) {
   return room.name;
 }
 
+// Local images are prioritized over database images.
+const localRoomImages = {
+  ROOM: ["/images/rooms/standardroom/1.jpg"],
+  DELUXE_TEST: ["/images/rooms/deluxeroom/1.jpg"],
+  VILLA: ["/images/rooms/standardvilla/1.jpg"],
+  "DELUXE VILLA": ["/images/rooms/deluxevilla/1.jpg"],
+};
+
+function getImageCandidates(room) {
+  const name = room.name?.toUpperCase();
+
+  const localImages = localRoomImages[name] || [];
+
+  const databaseImages = Array.isArray(room.images)
+    ? room.images
+        .map((image) =>
+          typeof image === "string" ? image : image?.url
+        )
+        .filter(Boolean)
+    : [];
+
+  return [
+    ...new Set([
+      ...localImages,
+      ...databaseImages,
+      "/images/hero/resort-hero.jpg",
+    ]),
+  ];
+}
+
 export default function RoomCard({ room, onSelect, price }) {
   const variant = getVariant(room);
   const style = variants[variant];
 
+  const imageCandidates = useMemo(
+    () => getImageCandidates(room),
+    [room]
+  );
+
+  const [imageIndex, setImageIndex] = useState(0);
+
+  useEffect(() => {
+    setImageIndex(0);
+  }, [room.id]);
+
   const image =
-    room.images?.[0]?.url ||
-    room.images?.[0] ||
+    imageCandidates[imageIndex] ||
     "/images/hero/resort-hero.jpg";
 
   return (
@@ -61,18 +102,23 @@ export default function RoomCard({ room, onSelect, price }) {
         <img
           src={image}
           alt={getDisplayName(room)}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          onError={() => {
+            setImageIndex((current) =>
+              Math.min(current + 1, imageCandidates.length - 1)
+            );
+          }}
+          className="h-full w-full object-contain transition-transform duration-500"
         />
       </div>
 
       {/* Room details */}
       <div className="flex flex-1 flex-col px-5 pb-4 pt-3 sm:px-6 sm:pb-5 sm:pt-3">
-        <h3 className="mb0 font-display text-3xl leading-none text-[#263b30]">
+        <h3 className="font-display text-3xl leading-none text-[#263b30]">
           {getDisplayName(room)}
         </h3>
 
         {/* Guest capacity and area */}
-        <div className="mt-0 grid grid-cols-2 gap-3 border-b border-[#e9e5dc] py-3">
+        <div className="mt-3 grid grid-cols-2 gap-3 border-b border-[#e9e5dc] py-3">
           <div>
             <p className="text-[10px] tracking-[0.15em] text-[#968d80]">
               MAXIMUM GUESTS
@@ -103,6 +149,7 @@ export default function RoomCard({ room, onSelect, price }) {
               {price != null
                 ? `₹${Math.round(price).toLocaleString("en-IN")}`
                 : "—"}
+
               <span className="ml-1 font-sans text-xs text-[#968d80]">
                 / night
               </span>

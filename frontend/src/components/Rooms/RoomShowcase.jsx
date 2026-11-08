@@ -1,9 +1,11 @@
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useBooking } from "@/components/Booking/BookingProvider";
 import { apiFetch } from "@/lib/api";
 import RoomCard from "./RoomCard";
+import ExpandedRoomCard from "@/components/Rooms/ExpandedRoomCard";
 
 function toDateString(value) {
   if (!value) return "";
@@ -36,6 +38,7 @@ export default function RoomShowcase() {
     [checkIn, checkOut]
   );
 
+  // Load room types
   useEffect(() => {
     let cancelled = false;
 
@@ -48,7 +51,9 @@ export default function RoomShowcase() {
 
         if (!cancelled) {
           setRooms(
-            (data.roomTypes || []).filter((room) => room.isActive !== false)
+            (data.roomTypes || []).filter(
+              (room) => room.isActive !== false
+            )
           );
         }
       } catch (err) {
@@ -56,7 +61,9 @@ export default function RoomShowcase() {
           setError(err.message || "Unable to load accommodation.");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -67,6 +74,7 @@ export default function RoomShowcase() {
     };
   }, []);
 
+  // Load availability
   useEffect(() => {
     let cancelled = false;
 
@@ -84,13 +92,17 @@ export default function RoomShowcase() {
           children: String(childrenCount),
         });
 
-        const data = await apiFetch(`/availability?${params.toString()}`);
+        const data = await apiFetch(
+          `/availability?${params.toString()}`
+        );
 
         if (!cancelled) {
           setAvailability(data.roomTypes || []);
         }
       } catch {
-        if (!cancelled) setAvailability([]);
+        if (!cancelled) {
+          setAvailability([]);
+        }
       }
     }
 
@@ -101,15 +113,23 @@ export default function RoomShowcase() {
     };
   }, [dates, adults, childrenCount]);
 
+  // Get nightly price
   function getPrice(roomId) {
-    const result = availability.find((item) => item.id === roomId);
+    const result = availability.find(
+      (item) => item.id === roomId
+    );
+
     const pricing = result?.pricing;
 
     if (!pricing || !pricing.nights) return null;
 
-    return Number(pricing.totalWithTax) / Number(pricing.nights);
+    return (
+      Number(pricing.totalWithTax) /
+      Number(pricing.nights)
+    );
   }
 
+  // Sort rooms by price
   const sortedRooms = useMemo(() => {
     return [...rooms].sort((a, b) => {
       const priceA = getPrice(a.id) ?? Infinity;
@@ -119,24 +139,21 @@ export default function RoomShowcase() {
     });
   }, [rooms, availability]);
 
-  function bookRoom(room) {
-    const params = new URLSearchParams({
-      roomTypeId: room.id,
-      quantity: "1",
-    });
-
-    if (dates.checkIn) params.set("checkIn", dates.checkIn);
-    if (dates.checkOut) params.set("checkOut", dates.checkOut);
-
-    params.set("adults", String(adults));
-    params.set("children", String(childrenCount));
-
-    window.location.href = `/booking?${params.toString()}`;
-  }
+  // Preserve room metadata when adding availability data.
+  const expandedRoom = selectedRoom
+    ? {
+        ...selectedRoom,
+        ...(availability.find(
+          (item) => item.id === selectedRoom.id
+        ) || {}),
+        amenities: selectedRoom.amenities || [],
+      }
+    : null;
 
   return (
     <section className="overflow-hidden bg-[#f5f2eb] pt-2 pb-16 sm:pt-8 sm:pb-20">
       <div className="mx-auto max-w-[1600px]">
+        {/* Heading */}
         <div className="mb-4 px-6 sm:px-12 lg:px-0">
           <p className="text-[13px] font-semibold tracking-[0.22em] text-[#9a7658]">
             STAY WITH US
@@ -148,24 +165,28 @@ export default function RoomShowcase() {
           </h2>
         </div>
 
+        {/* Loading */}
         {loading && (
           <p className="px-6 py-16 text-center text-sm text-[#71695f]">
             Discovering our rooms...
           </p>
         )}
 
+        {/* Error */}
         {error && (
           <p className="px-6 py-12 text-center text-sm text-red-700">
             {error}
           </p>
         )}
 
+        {/* Empty state */}
         {!loading && !error && rooms.length === 0 && (
           <p className="px-6 py-16 text-center text-sm text-[#71695f]">
             No accommodation is currently available.
           </p>
         )}
 
+        {/* Room carousel */}
         {!loading && rooms.length > 0 && (
           <div
             className="flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-6 sm:gap-6 sm:px-12 lg:px-20"
@@ -188,114 +209,12 @@ export default function RoomShowcase() {
         )}
       </div>
 
-      {selectedRoom && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
-          onClick={() => setSelectedRoom(null)}
-        >
-          <article
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="room-dialog-title"
-            className="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto bg-[#f5f2eb] shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setSelectedRoom(null)}
-              aria-label="Close room details"
-              className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-xl text-[#382f27] shadow"
-            >
-              ×
-            </button>
-
-            <div className="grid md:grid-cols-2">
-              <div className="min-h-[300px] bg-[#e7e2d8] md:min-h-[580px]">
-                <img
-                  src={
-                    selectedRoom.images?.[0]?.url ||
-                    selectedRoom.images?.[0] ||
-                    "/images/hero/resort-hero.jpg"
-                  }
-                  alt={selectedRoom.name}
-                  className="h-full min-h-[300px] w-full object-cover md:min-h-[580px]"
-                />
-              </div>
-
-              <div className="flex flex-col justify-center p-7 sm:p-10">
-                <p className="text-[10px] font-semibold tracking-[0.2em] text-[#9a7658]">
-                  THE ESTATE · ACCOMMODATION
-                </p>
-
-                <h2
-                  id="room-dialog-title"
-                  className="mt-4 font-display text-4xl leading-tight text-[#263b30] sm:text-5xl"
-                >
-                  {selectedRoom.name}
-                </h2>
-
-                <p className="mt-5 text-sm leading-7 text-[#71695f]">
-                  {selectedRoom.description ||
-                    selectedRoom.shortDescription ||
-                    "Experience a peaceful stay in the heart of the coffee estate."}
-                </p>
-
-                <div className="mt-7 grid grid-cols-2 gap-4 border-y border-[#263b30]/15 py-6">
-                  <div>
-                    <p className="text-[10px] tracking-widest text-[#968d80]">
-                      MAXIMUM GUESTS
-                    </p>
-                    <p className="mt-2 text-sm text-[#263b30]">
-                      Up to {selectedRoom.maxGuests} guests
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] tracking-widest text-[#968d80]">
-                      ROOM AREA
-                    </p>
-                    <p className="mt-2 text-sm text-[#263b30]">
-                      {selectedRoom.area
-                        ? `${selectedRoom.area} sq. ft.`
-                        : "Not specified"}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedRoom.amenities?.length > 0 && (
-                  <div className="mt-6">
-                    <p className="text-[10px] tracking-widest text-[#968d80]">
-                      AMENITIES
-                    </p>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedRoom.amenities.map((amenity, index) => (
-                        <span
-                          key={`${amenity}-${index}`}
-                          className="border border-[#263b30]/15 px-3 py-2 text-xs text-[#263b30]"
-                        >
-                          {amenity}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => bookRoom(selectedRoom)}
-                  className="mt-9 w-full bg-[#263b30] px-6 py-4 text-sm font-medium tracking-wide text-white transition hover:bg-[#405a47]"
-                >
-                  CHECK AVAILABILITY & BOOK
-                </button>
-
-                <p className="mt-3 text-center text-xs text-[#968d80]">
-                  Select your dates and complete your reservation.
-                </p>
-              </div>
-            </div>
-          </article>
-        </div>
+      {/* Room details modal */}
+      {expandedRoom && (
+        <ExpandedRoomCard
+          room={expandedRoom}
+          onClose={() => setSelectedRoom(null)}
+        />
       )}
     </section>
   );
