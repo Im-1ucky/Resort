@@ -13,6 +13,9 @@ export default function BookingBar({ placement = "hero" }) {
   const isHome = pathname === "/";
   const isHeroInstance = placement === "hero";
 
+  const hideBookingBar =
+    pathname === "/booking" || pathname === "/payment";
+
   const [scrolled, setScrolled] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -33,15 +36,11 @@ export default function BookingBar({ placement = "hero" }) {
       passive: true,
     });
 
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [isHome]);
 
-  // Show the Hero instance only on the homepage.
+  if (hideBookingBar) return null;
   if (isHeroInstance && !isHome) return null;
-
-  // Show the global instance only on inner pages.
   if (!isHeroInstance && isHome) return null;
 
   const isCompact = isHome ? scrolled : !expanded;
@@ -82,7 +81,6 @@ export default function BookingBar({ placement = "hero" }) {
             : "grid-cols-1 gap-y-3 rounded-xl bg-[#F5F2EA] p-4 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-4 sm:px-5 sm:py-4"
         }`}
       >
-        {/* Check-in and Check-out */}
         <motion.div
           layout
           className={`h-full min-w-0 ${
@@ -92,12 +90,10 @@ export default function BookingBar({ placement = "hero" }) {
           <DateRangePicker compact={isCompact} />
         </motion.div>
 
-        {/* Guests */}
         <motion.div layout className="h-full min-w-0">
           <GuestSelector compact={isCompact} />
         </motion.div>
 
-        {/* Search / Expand */}
         {isCompact ? (
           <button
             type={isHome ? "submit" : "button"}

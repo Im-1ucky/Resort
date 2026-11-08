@@ -33,6 +33,11 @@ enum PaymentStatus {
   FAILED
 }
 
+enum PaymentMethod {
+  UPI
+  CARD
+}
+
 enum DiscountType {
   PERCENTAGE
   FIXED
@@ -209,6 +214,7 @@ model Payment {
   bookingId     String
   amount        Decimal       @db.Decimal(12, 2)
   status        PaymentStatus @default(PENDING)
+  paymentMethod PaymentMethod?
   transactionId String?       @unique
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
