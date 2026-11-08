@@ -2,10 +2,12 @@
 "use client";
 
 function getVariant(room) {
-  const name = room.name.toLowerCase();
+  const name = room.name.toUpperCase();
 
-  if (name.includes("villa")) return "villa";
-  if (name.includes("deluxe")) return "deluxe";
+  if (name === "DELUXE VILLA") return "villa";
+  if (name === "VILLA") return "villa";
+  if (name === "DELUXE_TEST") return "deluxe";
+
   return "standard";
 }
 
@@ -22,12 +24,14 @@ const variants = {
 };
 
 function getDisplayName(room) {
-  const variant = getVariant(room);
+  const name = room.name.toUpperCase();
 
-  if (variant === "standard") return "Standard Room";
-  if (variant === "deluxe") return "Deluxe Room";
+  if (name === "ROOM") return "Standard Room";
+  if (name === "DELUXE_TEST") return "Deluxe Room";
+  if (name === "VILLA") return "Standard Villa";
+  if (name === "DELUXE VILLA") return "Deluxe Villa";
 
-  return "Villa";
+  return room.name;
 }
 
 export default function RoomCard({ room, onSelect, price }) {

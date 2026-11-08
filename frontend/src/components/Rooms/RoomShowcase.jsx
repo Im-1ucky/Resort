@@ -110,6 +110,15 @@ export default function RoomShowcase() {
     return Number(pricing.totalWithTax) / Number(pricing.nights);
   }
 
+  const sortedRooms = useMemo(() => {
+    return [...rooms].sort((a, b) => {
+      const priceA = getPrice(a.id) ?? Infinity;
+      const priceB = getPrice(b.id) ?? Infinity;
+
+      return priceA - priceB;
+    });
+  }, [rooms, availability]);
+
   function bookRoom(room) {
     const params = new URLSearchParams({
       roomTypeId: room.id,
@@ -126,25 +135,17 @@ export default function RoomShowcase() {
   }
 
   return (
-    <section className="overflow-hidden bg-[#f5f2eb] py-20 sm:py-24">
+    <section className="overflow-hidden bg-[#f5f2eb] pt-2 pb-16 sm:pt-8 sm:pb-20">
       <div className="mx-auto max-w-[1600px]">
-        <div className="mb-10 flex flex-col gap-4 px-6 sm:px-12 lg:flex-row lg:items-end lg:justify-between lg:px-20">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.22em] text-[#9a7658]">
-              STAY WITH US
-            </p>
-
-            <h2 className="mt-3 font-display text-5xl leading-tight text-[#263b30] sm:text-6xl">
-              Find your place
-              <br />
-              <span className="italic">in the hills.</span>
-            </h2>
-          </div>
-
-          <p className="max-w-sm text-sm leading-7 text-[#71695f]">
-            From thoughtful rooms to private villas, discover a stay that
-            feels like your own corner of the Western Ghats.
+        <div className="mb-4 px-6 sm:px-12 lg:px-0">
+          <p className="text-[13px] font-semibold tracking-[0.22em] text-[#9a7658]">
+            STAY WITH US
           </p>
+
+          <h2 className="mt-3 whitespace-nowrap font-display text-3xl leading-tight text-[#263b30] sm:text-4xl lg:text-5xl">
+            Find your place{" "}
+            <span className="italic">in the hills.</span>
+          </h2>
         </div>
 
         {loading && (
@@ -174,7 +175,7 @@ export default function RoomShowcase() {
               WebkitOverflowScrolling: "touch",
             }}
           >
-            {rooms.map((room) => (
+            {sortedRooms.map((room) => (
               <div key={room.id} className="snap-start">
                 <RoomCard
                   room={room}
