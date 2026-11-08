@@ -122,11 +122,17 @@ model Room {
 }
 
 model RoomType {
-  id         String  @id @default(uuid())
-  name       String  @unique
-  maxGuests  Int
-  totalUnits Int
-  isActive   Boolean @default(true)
+  id               String  @id @default(uuid())
+  name             String  @unique
+  shortDescription String?
+  description      String?
+  maxGuests        Int
+  totalUnits       Int
+  area             Int?
+  bedConfiguration String?
+  amenities        String[] @default([])
+  images           String[] @default([])
+  isActive         Boolean @default(true)
 
   bookingItems  BookingItem[]
   dailyRates    DailyRate[]

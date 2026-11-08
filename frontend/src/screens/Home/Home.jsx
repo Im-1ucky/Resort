@@ -1,6 +1,6 @@
-
 import Navbar from "@/components/Navbar/Navbar";
 import Hero from "./sections/Hero";
+import RoomShowcase from "@/components/Rooms/RoomShowcase";
 
 export default function Home() {
   return (
@@ -10,7 +10,9 @@ export default function Home() {
       <main>
         <Hero />
 
-        <section className="min-h-screen bg-ivory px-6 py-24 sm:px-12 lg:px-24">
+        <RoomShowcase />
+
+        <section className="bg-[#e9e5da] px-6 py-24 sm:px-12 lg:px-24">
           <div className="mx-auto max-w-6xl">
             <p className="text-xs font-semibold tracking-[0.2em] text-wood">
               THE ESTATE EXPERIENCE

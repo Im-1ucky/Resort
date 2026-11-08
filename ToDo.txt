@@ -1,0 +1,5 @@
+Backend
+1. Implement RLS
+
+Frontend
+1. Polish the booking bar animation
