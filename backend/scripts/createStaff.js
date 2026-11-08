@@ -1,3 +1,4 @@
+
 import bcrypt from "bcryptjs";
 import prisma from "../src/lib/prisma.js";
 
@@ -14,6 +15,24 @@ const staffAccounts = [
     password: process.env.SALES_PASSWORD,
     role: "SALES",
   },
+  {
+    name: "General Manager",
+    email: process.env.GM_EMAIL?.trim().toLowerCase(),
+    password: process.env.GM_PASSWORD,
+    role: "GM",
+  },
+  {
+    name: "Administrator",
+    email: process.env.ADMIN_EMAIL?.trim().toLowerCase(),
+    password: process.env.ADMIN_PASSWORD,
+    role: "ADMIN",
+  },
+  {
+    name: "Developer",
+    email: process.env.DEV_EMAIL?.trim().toLowerCase(),
+    password: process.env.DEV_PASSWORD,
+    role: "DEV",
+  },
 ];
 
 async function main() {
@@ -23,7 +42,9 @@ async function main() {
     }
 
     if (account.password.length < 12) {
-      throw new Error(`${account.role} password must be at least 12 characters`);
+      throw new Error(
+        `${account.role} password must be at least 12 characters`
+      );
     }
 
     const existing = await prisma.user.findUnique({

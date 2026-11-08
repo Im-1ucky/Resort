@@ -18,17 +18,18 @@ function getEnquiryScope(user) {
   }
 
   if (user.role === "RESERVATIONS") {
-    return {
-      department: { in: ["RESERVATIONS", "UNSORTED"] },
-    };
+    return { department: "RESERVATIONS" };
   }
 
-  return {
-    department: { in: ["SALES", "UNSORTED"] },
-  };
+  if (user.role === "SALES") {
+    return { department: "SALES" };
+  }
+
+  return { id: "__NO_ACCESS__" };
 }
 
-// GET /api/enquiries - Staff inbox
+
+// GET /api/enquiries - Staff inbox with search and priority pagination.
 router.get("/", async (req, res, next) => {
   try {
     const querySchema = z.object({
@@ -49,8 +50,9 @@ router.get("/", async (req, res, next) => {
         "COMPLAINT",
         "GENERAL",
       ]).optional(),
+      search: z.string().trim().max(200).optional(),
       page: z.coerce.number().int().min(1).default(1),
-      limit: z.coerce.number().int().min(1).max(100).default(20),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
     });
 
     const parsed = querySchema.safeParse(req.query);
@@ -62,7 +64,14 @@ router.get("/", async (req, res, next) => {
       });
     }
 
-    const { department, status, category, page, limit } = parsed.data;
+    const {
+      department,
+      status,
+      category,
+      search,
+      page,
+      limit,
+    } = parsed.data;
 
     const scope = getEnquiryScope(req.user);
 
@@ -71,28 +80,97 @@ router.get("/", async (req, res, next) => {
       ...(department && { department }),
       ...(status && { status }),
       ...(category && { category }),
+      ...(search && {
+        OR: [
+          { guestName: { contains: search, mode: "insensitive" } },
+          { guestEmail: { contains: search, mode: "insensitive" } },
+        ],
+      }),
     };
 
-    const [enquiries, total] = await prisma.$transaction([
-      prisma.enquiry.findMany({
-        where,
-        orderBy: [
-          { lastMessageAt: "desc" },
-          { createdAt: "desc" },
-        ],
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          assignedTo: {
-            select: { id: true, name: true, email: true },
-          },
-          _count: {
-            select: { messages: true },
-          },
-        },
-      }),
-      prisma.enquiry.count({ where }),
+    const pendingStatuses = [
+      "NEW",
+      "ASSIGNED",
+      "IN_PROGRESS",
+      "WAITING_FOR_GUEST",
+    ];
+
+    const pendingWhere = {
+      ...where,
+      status: { in: status ? [status].filter((s) => pendingStatuses.includes(s)) : pendingStatuses },
+    };
+
+    const completedWhere = {
+      ...where,
+      status: { in: status ? [status].filter((s) => ["RESOLVED", "CLOSED"].includes(s)) : ["RESOLVED", "CLOSED"] },
+    };
+
+    const [pendingTotal, completedTotal] = await Promise.all([
+      prisma.enquiry.count({ where: pendingWhere }),
+      prisma.enquiry.count({ where: completedWhere }),
     ]);
+
+    const offset = (page - 1) * limit;
+
+    const orderBy = [
+      { lastMessageAt: "desc" },
+      { createdAt: "desc" },
+    ];
+
+    const include = {
+      assignedTo: {
+        select: { id: true, name: true, email: true },
+      },
+      messages: {
+        where: { senderType: "GUEST" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { content: true },
+      },
+      _count: {
+        select: { messages: true },
+      },
+    };
+
+    let enquiries = [];
+
+    if (offset < pendingTotal) {
+      const pendingTake = Math.min(limit, pendingTotal - offset);
+
+      const pendingEnquiries = await prisma.enquiry.findMany({
+        where: pendingWhere,
+        orderBy,
+        skip: offset,
+        take: pendingTake,
+        include,
+      });
+
+      enquiries.push(...pendingEnquiries);
+
+      const remaining = limit - pendingEnquiries.length;
+
+      if (remaining > 0) {
+        const completedEnquiries = await prisma.enquiry.findMany({
+          where: completedWhere,
+          orderBy,
+          skip: 0,
+          take: remaining,
+          include,
+        });
+
+        enquiries.push(...completedEnquiries);
+      }
+    } else {
+      enquiries = await prisma.enquiry.findMany({
+        where: completedWhere,
+        orderBy,
+        skip: offset - pendingTotal,
+        take: limit,
+        include,
+      });
+    }
+
+    const total = pendingTotal + completedTotal;
 
     return res.json({
       success: true,
@@ -102,12 +180,15 @@ router.get("/", async (req, res, next) => {
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+        pending: pendingTotal,
+        solved: completedTotal,
       },
     });
   } catch (error) {
     next(error);
   }
 });
+
 
 // GET /api/enquiries/:id - Conversation details
 router.get("/:id", async (req, res, next) => {
@@ -171,14 +252,13 @@ function canManageEnquiry(user, enquiry) {
   if (["ADMIN", "GM"].includes(user.role)) return true;
 
   if (user.role === "RESERVATIONS") {
-    return ["RESERVATIONS", "UNSORTED"].includes(enquiry.department);
+    return enquiry.department === "RESERVATIONS";
   }
 
   if (user.role === "SALES") {
-    return ["SALES", "UNSORTED"].includes(enquiry.department);
+    return enquiry.department === "SALES";
   }
 
-  // DEV can inspect enquiries but cannot modify them.
   return false;
 }
 
@@ -911,5 +991,33 @@ router.post(
   },
 );
 
+// DEV-only: permanently delete an enquiry.
+// DELETE /api/enquiries/:id
+router.delete("/:id", authorize("DEV"), async (req, res, next) => {
+  try {
+    const enquiry = await prisma.enquiry.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, subject: true },
+    });
+
+    if (!enquiry) {
+      return res.status(404).json({
+        success: false,
+        message: "Enquiry not found",
+      });
+    }
+
+    await prisma.enquiry.delete({
+      where: { id: enquiry.id },
+    });
+
+    return res.json({
+      success: true,
+      message: "Enquiry permanently deleted",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

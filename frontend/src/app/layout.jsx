@@ -1,7 +1,7 @@
+
 import "./globals.css";
 import { BookingProvider } from "@/components/Booking/BookingProvider";
-import BookingBar from "@/components/Booking/BookingBar";
-import FloatingEnquiry from "@/components/Enquiry/FloatingEnquiry";
+import SiteOverlays from "@/components/Staff/SiteOverlays";
 
 export const metadata = {
   title: "The Estate | Coffee Estate Resort",
@@ -15,8 +15,7 @@ export default function RootLayout({ children }) {
       <body>
         <BookingProvider>
           {children}
-          <BookingBar placement="global" />
-          <FloatingEnquiry />
+          <SiteOverlays />
         </BookingProvider>
       </body>
     </html>
