@@ -40,8 +40,8 @@ export default function Hero() {
       </div>
 
       {/* Booking bar */}
-      <div className="absolute bottom-0 left-0 z-10 w-full px-4 pb-5 sm:px-8 sm:pb-8 lg:pb-10">
-        <BookingBar />
+      <div className="absolute bottom-0 left-0 z-30 w-full px-4 pb-5 sm:px-8 sm:pb-8 lg:pb-10">
+        <BookingBar placement="hero" />
       </div>
     </section>
   );

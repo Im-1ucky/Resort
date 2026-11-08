@@ -10,6 +10,7 @@ import { useBooking } from "@/components/Booking/BookingProvider";
 export default function DateRangePicker({
   checkInName = "checkIn",
   checkOutName = "checkOut",
+  compact = false,
 }) {
   const {
     checkIn: startDate,
@@ -126,10 +127,14 @@ export default function DateRangePicker({
   }
 
   const dateLabel = (date) =>
-    date ? format(date, "dd/MM/yyyy") : "Select date";
+    date
+      ? format(date, compact ? "MMM d" : "dd/MM/yyyy")
+      : compact
+        ? "Add date"
+        : "Select date";
 
   return (
-    <div ref={pickerRef} className="relative w-full">
+    <div ref={pickerRef} className="relative h-full w-full">
       {/* Check-in and check-out fields */}
       <button
         ref={triggerRef}
@@ -137,41 +142,63 @@ export default function DateRangePicker({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-label="Choose check-in and check-out dates"
-        className="grid w-full grid-cols-[1fr_auto_1fr_auto] items-center gap-3 text-left"
+        className={`grid h-full w-full items-center text-left ${
+          compact
+            ? "grid-cols-2 gap-0"
+            : "grid-cols-[1fr_auto_1fr_auto] gap-3"
+        }`}
       >
-        <div className="min-w-0">
+        <div
+          className={`flex min-h-[48px] min-w-0 flex-col justify-center ${
+            compact ? "border-r border-forest/20 pr-3" : ""
+          }`}
+        >
           <span className="mb-1 block text-[10px] font-semibold tracking-[0.12em] text-wood">
             CHECK IN
           </span>
 
           <span
-            className={`block truncate border-b py-1 text-sm ${
-              startDate
-                ? "border-forest/20 text-forest"
-                : "border-forest/20 text-forest/45"
-            }`}
+            className={`block truncate py-1 text-sm font-medium ${
+              startDate ? "text-forest" : "text-forest/45"
+            } ${compact ? "" : "border-b border-forest/20"}`}
           >
             {dateLabel(startDate)}
           </span>
         </div>
 
-        <span className="mt-5 text-wood">→</span>
+        {compact ? (
+          <div className="flex min-h-[48px] min-w-0 flex-col justify-center pl-3">
+            <span className="mb-1 block text-[10px] font-semibold tracking-[0.12em] text-wood">
+              CHECK OUT
+            </span>
 
-        <div className="min-w-0">
-          <span className="mb-1 block text-[10px] font-semibold tracking-[0.12em] text-wood">
-            CHECK OUT
-          </span>
+            <span
+              className={`block truncate py-1 text-sm font-medium ${
+                endDate ? "text-forest" : "text-forest/45"
+              }`}
+            >
+              {dateLabel(endDate)}
+            </span>
+          </div>
+        ) : (
+          <>
+            <span className="mt-5 text-wood">→</span>
 
-          <span
-            className={`block truncate border-b py-1 text-sm ${
-              endDate
-                ? "border-forest/20 text-forest"
-                : "border-forest/20 text-forest/45"
-            }`}
-          >
-            {dateLabel(endDate)}
-          </span>
-        </div>
+            <div className="flex min-h-[48px] min-w-0 flex-col justify-center">
+              <span className="mb-1 block text-[10px] font-semibold tracking-[0.12em] text-wood">
+                CHECK OUT
+              </span>
+
+              <span
+                className={`block truncate border-b border-forest/20 py-1 text-sm font-medium ${
+                  endDate ? "text-forest" : "text-forest/45"
+                }`}
+              >
+                {dateLabel(endDate)}
+              </span>
+            </div>
+          </>
+        )}
       </button>
 
       {/* Calendar popup */}

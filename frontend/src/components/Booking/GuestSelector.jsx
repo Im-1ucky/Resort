@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useBooking } from "./BookingProvider";
 
-export default function GuestSelector() {
+export default function GuestSelector({ compact = false }) {
   const {
     adults,
     setAdults,
@@ -53,24 +53,33 @@ export default function GuestSelector() {
   }
 
   return (
-    <div ref={selectorRef} className="relative min-w-0">
+    <div
+      ref={selectorRef}
+      className={`relative h-full min-w-0 ${
+        compact ? "border-l border-forest/20 pl-3" : ""
+      }`}
+    >
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="w-full text-left"
+        className="flex h-full min-h-[48px] w-full flex-col justify-center text-left"
       >
         <p className="mb-1 text-[10px] font-semibold tracking-[0.12em] text-wood">
           GUESTS
         </p>
 
-        <p className="block truncate border-b border-forest/20 py-1 text-sm font-medium text-forest">
+        <p
+          className={`block truncate py-1 text-sm font-medium text-forest ${
+            compact ? "" : "border-b border-forest/20"
+          }`}
+        >
           {guests} {guests === 1 ? "Guest" : "Guests"}
         </p>
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-3 w-64 rounded-xl border border-forest/10 bg-[#F5F2EA] p-4 text-forest shadow-xl">
+        <div className="absolute right-0 top-full z-50 mt-3 w-64 rounded-xl border border-forest/10 bg-[#F5F2EA] p-4 text-forest shadow-xl">
           {[
             {
               label: "Adults",
