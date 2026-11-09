@@ -56,7 +56,7 @@ export default function GuestSelector({ compact = false }) {
     <div
       ref={selectorRef}
       className={`relative h-full min-w-0 ${
-        compact ? "border-l border-forest/20 pl-3" : ""
+        compact ? "pl-3" : ""
       }`}
     >
       <button

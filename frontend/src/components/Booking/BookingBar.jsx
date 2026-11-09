@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
+import { Search } from "lucide-react";
 
 import DateRangePicker from "@/components/ui/DateRangePicker";
 import GuestSelector from "./GuestSelector";
@@ -43,7 +44,8 @@ export default function BookingBar({ placement = "hero" }) {
   if (isHeroInstance && !isHome) return null;
   if (!isHeroInstance && isHome) return null;
 
-  const isCompact = isHome ? scrolled : !expanded;
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+  const isCompact = isMobile || (isHome ? scrolled : !expanded);
   const isFloating = !isHeroInstance || scrolled;
 
   return (
@@ -57,7 +59,7 @@ export default function BookingBar({ placement = "hero" }) {
         },
       }}
       className={`mx-auto w-full ${
-        isCompact ? "max-w-[480px]" : "max-w-3xl"
+        isCompact ? "max-w-[450px]" : "max-w-[650px]"
       } ${
         isFloating
           ? "fixed left-1/2 top-4 z-[100] -translate-x-1/2 px-4"
@@ -75,56 +77,32 @@ export default function BookingBar({ placement = "hero" }) {
             damping: 30,
           },
         }}
-        className={`grid text-[#382F27] shadow-xl ${
-          isCompact
-            ? "grid-cols-[2fr_1fr_42px] items-stretch gap-0 rounded-full bg-[#F5F2EA] px-3 py-2"
-            : "grid-cols-1 gap-y-3 rounded-xl bg-[#F5F2EA] p-4 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-4 sm:px-5 sm:py-4"
-        }`}
+        className="grid w-full grid-cols-[2fr_1.5fr_42px] items-center gap-0 rounded-full bg-ivory px-3 py-2 text-[#382F27] shadow-xl"
       >
+        {/* Dates */}
         <motion.div
           layout
-          className={`h-full min-w-0 ${
-            isCompact ? "pl-3" : "sm:col-span-2"
-          }`}
+          className="h-full min-w-0 border-r border-[#D8D0C4] pl-3"
         >
-          <DateRangePicker compact={isCompact} />
+          <DateRangePicker compact />
         </motion.div>
 
-        <motion.div layout className="h-full min-w-0">
-          <GuestSelector compact={isCompact} />
+        {/* Guests */}
+        <motion.div
+          layout
+          className="h-full min-w-0 px-3"
+        >
+          <GuestSelector compact />
         </motion.div>
 
-        {isCompact ? (
-          <button
-            type={isHome ? "submit" : "button"}
-            onClick={() => {
-              if (!isHome) setExpanded(true);
-            }}
-            aria-label={
-              isHome ? "Check availability" : "Expand booking bar"
-            }
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#382F27] text-[#F5F2EA] transition-colors hover:bg-[#241C17]"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="h-4 w-4"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m16 16 4 4" />
-            </svg>
-          </button>
-        ) : (
-          <motion.button
-            layout
-            type="submit"
-            className="col-span-1 h-10 w-full rounded-full bg-[#382F27] text-[11px] font-semibold tracking-wide text-[#F5F2EA] transition-colors hover:bg-[#241C17] sm:col-span-3"
-          >
-            CHECK AVAILABILITY
-          </motion.button>
-        )}
+        {/* Search */}
+        <button
+          type="submit"
+          aria-label="Check availability"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-[#382F27] text-[#F5F2EA] transition-colors hover:bg-[#241C17]"
+        >
+          <Search size={18} strokeWidth={2} />
+        </button>
       </motion.form>
     </motion.div>
   );

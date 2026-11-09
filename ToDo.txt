@@ -1,5 +1,2 @@
 Frontend
-1. Polish the booking bar animation
-2. Cancel booking
-3. Hero Page
-4. Logged In
+1. Cancel booking
