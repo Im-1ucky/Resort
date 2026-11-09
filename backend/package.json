@@ -23,6 +23,7 @@
     "zod": "^4.6.7"
   },
   "scripts": {
+    "start": "node index.js",
     "postinstall": "prisma generate",
     "db:seed": "bun prisma/seed.js",
     "test": "bun test"
