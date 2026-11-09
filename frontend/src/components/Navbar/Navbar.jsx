@@ -1,3 +1,4 @@
+
 "use client";
 
 import { UserRound } from "lucide-react";
@@ -32,25 +33,25 @@ export default function Navbar() {
 
   return (
     <header className="absolute inset-x-0 top-0 z-50 w-full">
-      <div className="flex h-[76px] w-full items-center justify-between bg-[#FCFBF8] pl-14 pr-4 sm:h-[88px] sm:pl-16 sm:pr-6 lg:pl-18 lg:pr-8 xl:pl-10 xl:pr-10">
+      <div className="flex h-[60px] w-full items-center justify-between bg-cream pl-3 pr-3 sm:h-[72px] sm:pl-10 sm:pr-6 lg:pl-14 lg:pr-10">
 
         {/* Brand */}
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-3 text-[#332A23]"
+          className="flex min-w-0 shrink items-center gap-2 text-[#332A23] sm:gap-3"
         >
           <img
             src="/images/logo/logo.svg"
             alt="The Estate mountain logo"
-            className="h-13 w-28 object-contain"
+            className="h-10 w-14 shrink-0 object-contain sm:h-13 sm:w-28"
           />
 
-          <div className="flex flex-col justify-center gap-1">
-            <span className="font-display text-lg leading-none tracking-[0.16em] sm:text-[23px]">
+          <div className="flex min-w-0 flex-col justify-center gap-1">
+            <span className="whitespace-nowrap font-display text-sm leading-none tracking-[0.12em] sm:text-[23px] sm:tracking-[0.16em]">
               THE ESTATE
             </span>
 
-            <span className="text-[7px] font-medium leading-none tracking-[0.25em] sm:text-[10px]">
+            <span className="whitespace-nowrap text-[6px] font-medium leading-none tracking-[0.18em] sm:text-[10px] sm:tracking-[0.25em]">
               RESORT &amp; STAYS
             </span>
           </div>
@@ -60,9 +61,9 @@ export default function Navbar() {
         {!loading && (
           <Link
             href={user ? "/profile" : "/staff/login"}
-            className="flex items-center gap-2 rounded-xl bg-coffee px-6 py-3 text-sm font-semibold !text-white transition hover:bg-coffee-dark sm:text-base"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-coffee px-3 py-2 text-xs font-semibold !text-white transition hover:bg-coffee-dark sm:gap-2 sm:rounded-xl sm:px-6 sm:py-3 sm:text-base"
           >
-            <UserRound size={19} strokeWidth={2} />
+            <UserRound size={17} strokeWidth={2} />
             {user ? "Profile" : "Login"}
           </Link>
         )}
