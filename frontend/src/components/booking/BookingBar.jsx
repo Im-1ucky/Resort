@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { Search } from "lucide-react";
 
-import DateRangePicker from "@/components/ui/DateRangePicker";
+import DateRangePicker from "@/components/booking/DateRangePicker";
 import GuestSelector from "./GuestSelector";
 
 export default function BookingBar({ placement = "hero" }) {

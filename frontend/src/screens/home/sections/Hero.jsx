@@ -1,5 +1,5 @@
 import Image from "next/image";
-import BookingBar from "@/components/Booking/BookingBar";
+import BookingBar from "@/components/booking/BookingBar";
 
 export default function Hero() {
   return (

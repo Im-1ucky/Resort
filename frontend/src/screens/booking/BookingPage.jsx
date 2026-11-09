@@ -3,12 +3,12 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/services/api";
 import {
   formatIndianDate,
   parseIndianDate,
   formatApiDate,
-} from "@/lib/date";
+} from "@/utils/date";
 
 export default function BookingPage() {
   const params = useSearchParams();

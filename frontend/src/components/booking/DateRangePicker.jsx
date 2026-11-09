@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import { format, startOfDay, isSameDay } from "date-fns";
-import { useBooking } from "@/components/Booking/BookingProvider";
-import { formatIndianDate, formatApiDate } from "@/lib/date";
+import { useBooking } from "@/contexts/BookingProvider";
+import { formatIndianDate, formatApiDate } from "@/utils/date";
 
 export default function DateRangePicker({
   checkInName = "checkIn",

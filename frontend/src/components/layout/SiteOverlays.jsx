@@ -2,8 +2,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import BookingBar from "@/components/Booking/BookingBar";
-import FloatingEnquiry from "@/components/Enquiry/FloatingEnquiry";
+import BookingBar from "@/components/booking/BookingBar";
+import FloatingEnquiry from "@/components/enquiry/FloatingEnquiry";
 
 export default function SiteOverlays() {
   const pathname = usePathname();

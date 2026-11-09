@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useBooking } from "./BookingProvider";
+import { useBooking } from "@/contexts/BookingProvider";
 
 export default function GuestSelector({ compact = false }) {
   const {

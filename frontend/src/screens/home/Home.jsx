@@ -1,7 +1,7 @@
 
-import Navbar from "@/components/Navbar/Navbar";
+import Navbar from "@/components/navbar/Navbar";
 import Hero from "./sections/Hero";
-import RoomShowcase from "@/components/Rooms/RoomShowcase";
+import RoomShowcase from "@/components/rooms/RoomShowcase";
 
 export default function Home() {
   return (

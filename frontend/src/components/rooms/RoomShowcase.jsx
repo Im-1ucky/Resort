@@ -2,10 +2,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useBooking } from "@/components/Booking/BookingProvider";
-import { apiFetch } from "@/lib/api";
+import { useBooking } from "@/contexts/BookingProvider";
+import { apiFetch } from "@/services/api";
 import RoomCard from "./RoomCard";
-import ExpandedRoomCard from "@/components/Rooms/ExpandedRoomCard";
+import ExpandedRoomCard from "@/components/rooms/ExpandedRoomCard";
 
 function toDateString(value) {
   if (!value) return "";

@@ -1,16 +1,29 @@
-# React + Vite
+# The Estate — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Next.js App Router frontend for The Estate resort booking platform.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+bun install
+bun run dev
+```
 
-## React Compiler
+## Validation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+bun run lint
+bun run build
+```
 
-## Expanding the Oxlint configuration
+## Source structure
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- `src/app/` — Next.js routes and layouts.
+- `src/pages/` — page implementations imported by route entrypoints.
+- `src/components/` — reusable UI components grouped by area.
+- `src/contexts/` — shared React context providers.
+- `src/services/` — API communication.
+- `src/utils/` — shared utility functions.
+- `src/styles/` — additional shared styles (created when needed).
+
+Environment variables are intentionally not included in this archive.

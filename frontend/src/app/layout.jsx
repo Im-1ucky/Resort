@@ -1,7 +1,7 @@
 
 import "./globals.css";
-import { BookingProvider } from "@/components/Booking/BookingProvider";
-import SiteOverlays from "@/components/Staff/SiteOverlays";
+import { BookingProvider } from "@/contexts/BookingProvider";
+import SiteOverlays from "@/components/layout/SiteOverlays";
 
 export const metadata = {
   title: "The Estate | Coffee Estate Resort",

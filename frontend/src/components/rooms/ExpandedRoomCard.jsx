@@ -7,8 +7,8 @@ import {
   formatIndianDate,
   parseIndianDate,
   formatApiDate,
-} from "@/lib/date";
-import { useBooking } from "@/components/Booking/BookingProvider";
+} from "@/utils/date";
+import { useBooking } from "@/contexts/BookingProvider";
 import useEmblaCarousel from "embla-carousel-react";
 import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import {

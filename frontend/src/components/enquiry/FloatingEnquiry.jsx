@@ -3,7 +3,7 @@
 
 import { MessageCircle, X, Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/services/api";
 
 export default function FloatingEnquiry() {
   const [isOpen, setIsOpen] = useState(false);

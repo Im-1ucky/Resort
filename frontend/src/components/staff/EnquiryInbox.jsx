@@ -11,7 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/services/api";
 
 const PAGE_SIZE = 50;
 
