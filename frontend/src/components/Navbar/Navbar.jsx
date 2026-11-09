@@ -24,7 +24,7 @@ export default function Navbar() {
           </Link>
 
           <Link
-            href="/my-bookings"
+            href="/staff/login"
             className="border border-white/70 px-6 py-2.5 text-xs tracking-[0.12em] text-white transition hover:border-white hover:bg-white/10"
           >
             LOGIN

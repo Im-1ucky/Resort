@@ -2,6 +2,7 @@ import express from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
+import { randomUUID } from "node:crypto";
 
 const router = express.Router();
 
@@ -16,6 +17,15 @@ const updateRoomStatusSchema = z.object({
 
 const updateRoomCategorySchema = z.object({
   roomTypeId: z.string().uuid(),
+});
+
+const updatePhysicalUnitsSchema = z.object({
+  totalUnits: z.number().int().min(0).max(500),
+});
+
+const bulkCreateRoomsSchema = z.object({
+  roomTypeId: z.string().uuid(),
+  count: z.number().int().min(1).max(100),
 });
 
 const roomInclude = {
@@ -546,6 +556,243 @@ router.delete(
 
       return res.status(500).json({
         message: "Failed to retire room",
+      });
+    }
+  }
+);
+
+// BULK UPDATE PHYSICAL ROOM COUNT
+router.patch(
+  "/category/:roomTypeId/units",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
+    const { roomTypeId } = req.params;
+    const parsed = updatePhysicalUnitsSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: "Physical units must be between 0 and 500",
+        errors: parsed.error.flatten(),
+      });
+    }
+
+    const { totalUnits } = parsed.data;
+
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        await lockRoomTypes(tx, [roomTypeId]);
+
+        const roomType = await tx.roomType.findUnique({
+          where: { id: roomTypeId },
+        });
+
+        if (!roomType) {
+          throw new Error("ROOM_TYPE_NOT_FOUND");
+        }
+
+        if (!roomType.isActive && totalUnits > roomType.totalUnits) {
+          throw new Error("ROOM_TYPE_INACTIVE");
+        }
+
+        const existingRooms = await tx.room.findMany({
+          where: {
+            roomTypeId,
+            isRetired: false,
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+        const currentUnits = existingRooms.length;
+
+        if (totalUnits > currentUnits) {
+          const difference = totalUnits - currentUnits;
+
+          for (let i = 0; i < difference; i++) {
+            await tx.room.create({
+              data: {
+                roomNumber: `AUTO-${roomTypeId.slice(0, 8)}-${randomUUID().slice(0, 8)}`,
+                roomTypeId,
+              },
+            });
+          }
+        } else if (totalUnits < currentUnits) {
+          const difference = currentUnits - totalUnits;
+          const candidates = [];
+
+          for (const room of existingRooms) {
+            await lockRoom(tx, room.id);
+
+            if (!(await hasActiveAssignment(tx, room.id))) {
+              candidates.push(room);
+
+              if (candidates.length === difference) break;
+            }
+          }
+
+          if (candidates.length < difference) {
+            throw new Error("INSUFFICIENT_UNASSIGNED_ROOMS");
+          }
+
+          for (const room of candidates) {
+            await tx.room.update({
+              where: { id: room.id },
+              data: {
+                isActive: false,
+                isRetired: true,
+              },
+            });
+          }
+        }
+
+        await tx.roomType.update({
+          where: { id: roomTypeId },
+          data: { totalUnits },
+        });
+
+        return { totalUnits };
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Physical units updated successfully",
+        ...result,
+      });
+    } catch (error) {
+      if (error.message === "ROOM_TYPE_NOT_FOUND") {
+        return res.status(404).json({
+          message: "Room category not found",
+        });
+      }
+
+      if (error.message === "ROOM_TYPE_INACTIVE") {
+        return res.status(409).json({
+          message: "Cannot increase units in an inactive category",
+        });
+      }
+
+      if (error.message === "INSUFFICIENT_UNASSIGNED_ROOMS") {
+        return res.status(409).json({
+          message:
+            "Cannot reduce units. Some rooms have active bookings or payment holds.",
+        });
+      }
+
+      console.error("Update physical units error:", error);
+
+      return res.status(500).json({
+        message: "Failed to update physical units",
+      });
+    }
+  }
+);
+
+// BULK REGISTER PHYSICAL ROOMS
+router.post(
+  "/bulk",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
+    const parsed = bulkCreateRoomsSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: "Invalid room details",
+        errors: parsed.error.flatten(),
+      });
+    }
+
+    const { roomTypeId, count } = parsed.data;
+
+    const prefixes = {
+      "DELUXE ROOM": "DR",
+      "DELUXE VILLA": "DV",
+      ROOM: "R",
+      VILLA: "V",
+    };
+
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        await lockRoomTypes(tx, [roomTypeId]);
+
+        const roomType = await tx.roomType.findUnique({
+          where: { id: roomTypeId },
+        });
+
+        if (!roomType) throw new Error("ROOM_TYPE_NOT_FOUND");
+        if (!roomType.isActive) throw new Error("ROOM_TYPE_INACTIVE");
+
+        const prefix = prefixes[roomType.name.toUpperCase()];
+
+        if (!prefix) throw new Error("UNKNOWN_ROOM_CATEGORY");
+
+        // Include retired rooms so their numbers are never reused.
+        const existingRooms = await tx.room.findMany({
+          where: { roomTypeId },
+          select: { roomNumber: true },
+        });
+
+        const highestNumber = existingRooms.reduce((max, room) => {
+          const match = room.roomNumber.match(
+            new RegExp(`^${prefix}(\\d+)$`)
+          );
+
+          return match ? Math.max(max, Number(match[1])) : max;
+        }, 100);
+
+        const newRooms = Array.from({ length: count }, (_, index) => ({
+          roomNumber: `${prefix}${highestNumber + index + 1}`,
+          roomTypeId,
+        }));
+
+        await tx.room.createMany({
+          data: newRooms,
+        });
+
+        await tx.roomType.update({
+          where: { id: roomTypeId },
+          data: {
+            totalUnits: { increment: count },
+          },
+        });
+
+        return newRooms;
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: `${count} rooms added successfully`,
+        rooms: result,
+      });
+    } catch (error) {
+      if (error.message === "ROOM_TYPE_NOT_FOUND") {
+        return res.status(404).json({
+          message: "Room category not found",
+        });
+      }
+
+      if (error.message === "ROOM_TYPE_INACTIVE") {
+        return res.status(409).json({
+          message: "Cannot add rooms to an inactive category",
+        });
+      }
+
+      if (error.message === "UNKNOWN_ROOM_CATEGORY") {
+        return res.status(400).json({
+          message: "No room-number prefix configured for this category",
+        });
+      }
+
+      if (error.code === "P2002") {
+        return res.status(409).json({
+          message: "A generated room number already exists. Please retry.",
+        });
+      }
+
+      console.error("Bulk room registration error:", error);
+
+      return res.status(500).json({
+        message: "Failed to add rooms",
       });
     }
   }

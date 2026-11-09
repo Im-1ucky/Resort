@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -41,7 +42,12 @@ export function StaffAuthProvider({ children }) {
     });
 
     setUser(data.user);
-    router.replace("/staff/dashboard");
+
+    if (data.user?.role === "ADMIN") {
+      router.replace("/staff/admin");
+    } else {
+      router.replace("/staff/dashboard");
+    }
 
     return data.user;
   }

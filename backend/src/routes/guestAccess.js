@@ -159,6 +159,50 @@ router.post("/otp/request", otpRequestLimiter, async (req, res) => {
   }
 });
 
+const identifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post("/identify", identifyLimiter, async (req, res) => {
+  const parsed = z.object({
+    email: z.string().trim().email().max(254),
+  }).safeParse(req.body);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      message: "Enter a valid email address",
+    });
+  }
+
+  try {
+    const staff = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: parsed.data.email,
+          mode: "insensitive",
+        },
+        role: { not: "GUEST" },
+      },
+      select: { id: true },
+    });
+
+    return res.json({
+      success: true,
+      accountType: staff ? "STAFF" : "GUEST",
+    });
+  } catch (error) {
+    console.error("Account identification failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to continue. Please try again.",
+    });
+  }
+});
+
 // VERIFY OTP
 router.post("/otp/verify", otpVerifyLimiter, async (req, res) => {
   const parsed = verifySchema.safeParse(req.body);
