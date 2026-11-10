@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -75,21 +76,56 @@ function StatusBadge({ status }) {
   );
 }
 
-function BookingCard({ booking, onCancel }) {
+function BookingCard({ booking, onCancel, onRequestOtp, onVerifyOtp }) {
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [requestingOtp, setRequestingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [guestToken, setGuestToken] = useState("");
+  const [demoOtp, setDemoOtp] = useState("");
   const [error, setError] = useState("");
 
   const roomNames = booking.items
     ?.map((item) => `${item.quantity} × ${item.roomType?.name || "Room"}`)
     .join(", ");
 
+  async function handleRequestOtp() {
+    setRequestingOtp(true);
+    setError("");
+
+    try {
+      const result = await onRequestOtp();
+      setOtpSent(true);
+      setDemoOtp(result.demoOtp || "");
+    } catch (err) {
+      setError(err.message || "Unable to send verification code.");
+    } finally {
+      setRequestingOtp(false);
+    }
+  }
+
+  async function handleVerifyOtp() {
+    setVerifyingOtp(true);
+    setError("");
+
+    try {
+      const result = await onVerifyOtp(otp);
+      setGuestToken(result.guestToken);
+    } catch (err) {
+      setError(err.message || "Invalid or expired OTP.");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  }
+
   async function handleCancel() {
     setCancelling(true);
     setError("");
 
     try {
-      await onCancel(booking.id);
+      await onCancel(booking.id, guestToken);
       setConfirming(false);
     } catch (err) {
       setError(err.message || "Unable to cancel booking.");
@@ -105,19 +141,16 @@ function BookingCard({ booking, onCancel }) {
           <p className="text-xs font-medium uppercase tracking-wider text-[#9a826b]">
             Booking reference
           </p>
-
           <h3 className="mt-1 font-semibold text-[#332A23]">
             {booking.id.slice(0, 8).toUpperCase()}
           </h3>
         </div>
-
         <StatusBadge status={booking.status} />
       </div>
 
       <div className="my-5 grid gap-4 border-y border-[#eee8e0] py-5 sm:grid-cols-2">
         <div className="flex items-start gap-3">
           <CalendarDays className="mt-0.5 text-[#9a826b]" size={18} />
-
           <div>
             <p className="text-xs text-[#8b8075]">Check-in</p>
             <p className="mt-1 text-sm font-medium text-[#332A23]">
@@ -128,7 +161,6 @@ function BookingCard({ booking, onCancel }) {
 
         <div className="flex items-start gap-3">
           <Clock3 className="mt-0.5 text-[#9a826b]" size={18} />
-
           <div>
             <p className="text-xs text-[#8b8075]">Check-out</p>
             <p className="mt-1 text-sm font-medium text-[#332A23]">
@@ -143,7 +175,6 @@ function BookingCard({ booking, onCancel }) {
           <MapPin size={16} className="mt-0.5 shrink-0 text-[#9a826b]" />
           {roomNames || "Room details unavailable"}
         </p>
-
         <p>
           {booking.adults} adults
           {booking.children > 0 ? ` · ${booking.children} children` : ""}
@@ -161,7 +192,10 @@ function BookingCard({ booking, onCancel }) {
         {cancellableStatuses.includes(booking.status) &&
           getBookingGroup(booking) === "upcoming" && (
             <button
-              onClick={() => setConfirming(true)}
+              onClick={() => {
+                setConfirming(true);
+                setError("");
+              }}
               className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50"
             >
               Cancel booking
@@ -186,23 +220,106 @@ function BookingCard({ booking, onCancel }) {
             handled according to the resort's payment and cancellation policy.
           </p>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          {!otpSent ? (
             <button
-              onClick={handleCancel}
-              disabled={cancelling}
-              className="rounded-lg bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
+              onClick={handleRequestOtp}
+              disabled={requestingOtp}
+              className="mt-4 rounded-lg bg-[#382e26] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             >
-              {cancelling ? "Cancelling..." : "Confirm cancellation"}
+              {requestingOtp ? "Sending OTP..." : "Verify with email OTP"}
             </button>
+          ) : !guestToken ? (
+            <>
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-[#65594e]">
+                  Enter the verification code sent to your registered email.
+                </p>
 
-            <button
-              onClick={() => setConfirming(false)}
-              disabled={cancelling}
-              className="rounded-lg border border-[#ded2c8] bg-white px-4 py-2.5 text-sm font-medium text-[#65594e]"
-            >
-              Keep booking
-            </button>
-          </div>
+                {demoOtp && (
+                  <p className="text-xs text-amber-700">
+                    Demo OTP: {demoOtp}
+                  </p>
+                )}
+
+                <input
+                  value={otp}
+                  onChange={(e) =>
+                    setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  placeholder="Enter 6-digit OTP"
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="w-full rounded-lg border border-[#ded2c8] bg-white px-4 py-3 text-sm outline-none focus:border-[#9a826b]"
+                />
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={verifyingOtp || otp.length !== 6}
+                    className="rounded-lg bg-[#382e26] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {verifyingOtp ? "Verifying..." : "Verify OTP"}
+                  </button>
+
+                  <button
+                    onClick={handleRequestOtp}
+                    disabled={requestingOtp}
+                    className="text-sm text-[#65594e] underline disabled:opacity-60"
+                  >
+                    {requestingOtp ? "Resending..." : "Resend OTP"}
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setConfirming(false)}
+                  disabled={verifyingOtp || requestingOtp}
+                  className="rounded-lg border border-[#ded2c8] bg-white px-4 py-2.5 text-sm font-medium text-[#65594e]"
+                >
+                  Keep booking
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="mt-4">
+              <p className="mb-3 text-sm font-medium text-green-700">
+                Email verified successfully.
+              </p>
+
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="rounded-lg bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
+              >
+                {cancelling ? "Cancelling..." : "Confirm cancellation"}
+              </button>
+            </div>
+          )}
+
+          {!otpSent && (
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => setConfirming(false)}
+                disabled={cancelling || requestingOtp || verifyingOtp}
+                className="rounded-lg border border-[#ded2c8] bg-white px-4 py-2.5 text-sm font-medium text-[#65594e]"
+              >
+                Keep booking
+              </button>
+            </div>
+          )}
+
+          {otpSent && guestToken && (
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => setConfirming(false)}
+                disabled={cancelling}
+                className="rounded-lg border border-[#ded2c8] bg-white px-4 py-2.5 text-sm font-medium text-[#65594e]"
+              >
+                Keep booking
+              </button>
+            </div>
+          )}
         </div>
       )}
     </article>
@@ -215,7 +332,6 @@ export default function MyBookingsPage() {
   const {
     user,
     loading: authLoading,
-    logout,
   } = useStaffAuth();
 
   const [bookings, setBookings] = useState([]);
@@ -276,9 +392,31 @@ export default function MyBookingsPage() {
 
   const visibleBookings = groupedBookings[activeTab];
 
-  async function cancelBooking(id) {
+  async function requestGuestOtp() {
+    return apiFetch("/guest/otp/request", {
+      method: "POST",
+      body: JSON.stringify({
+        identifier: user.email,
+      }),
+    });
+  }
+
+  async function verifyGuestOtp(otp) {
+    return apiFetch("/guest/otp/verify", {
+      method: "POST",
+      body: JSON.stringify({
+        identifier: user.email,
+        otp,
+      }),
+    });
+  }
+
+  async function cancelBooking(id, guestToken) {
     await apiFetch(`/bookings/${id}/cancel`, {
       method: "POST",
+      headers: {
+        Authorization: `Bearer ${guestToken}`,
+      },
       body: JSON.stringify({}),
     });
 
@@ -393,6 +531,8 @@ export default function MyBookingsPage() {
                 key={booking.id}
                 booking={booking}
                 onCancel={cancelBooking}
+                onRequestOtp={requestGuestOtp}
+                onVerifyOtp={verifyGuestOtp}
               />
             ))}
           </div>
