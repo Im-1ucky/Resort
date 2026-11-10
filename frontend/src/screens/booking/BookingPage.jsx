@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useStaffAuth } from "@/contexts/StaffAuthProvider";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/services/api";
 import {
@@ -13,6 +14,7 @@ import {
 export default function BookingPage() {
   const params = useSearchParams();
   const router = useRouter();
+  const { user } = useStaffAuth();
 
   const roomTypeId =
     params.get("roomTypeId") || params.get("id") || "";
@@ -43,6 +45,20 @@ export default function BookingPage() {
         : value,
     }));
   }
+
+  useEffect(() => {
+    if (!user) return;
+
+    setForm((current) => ({
+      ...current,
+      guestName:
+        user.name && user.name !== "Guest"
+          ? user.name
+          : current.guestName,
+      guestEmail: user.email || current.guestEmail,
+      guestPhone: user.phone || current.guestPhone,
+    }));
+  }, [user]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -182,7 +198,7 @@ export default function BookingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--ivory)] px-5 pb-20 pt-32">
+    <main className="min-h-screen bg-[var(--ivory)] px-5 pb-10 pt-12">
       <section className="mx-auto max-w-2xl">
         <h1 className="mt-3 font-[var(--font-display)] text-5xl text-[var(--forest)]">
           Complete your booking
@@ -194,7 +210,7 @@ export default function BookingPage() {
 
         <form
           onSubmit={handleSubmit}
-          className="mt-9 space-y-6 rounded-2xl bg-white p-6 shadow-sm md:p-9"
+          className="mt-7 space-y-5 rounded-2xl bg-white p-0 pb-0 shadow-sm md:p-4 md:pb-0"
         >
           {/* Guest details */}
           <div>

@@ -703,6 +703,7 @@ router.post("/:id/cancel", bookingLimiter, async (req, res) => {
           select: {
             id: true,
             status: true,
+            checkOut: true,
             guestEmail: true,
             guestPhone: true,
             cancellationTokenHash: true,
@@ -760,6 +761,13 @@ router.post("/:id/cancel", bookingLimiter, async (req, res) => {
           return res.status(401).json({
             success: false,
             message: "Valid guest verification, cancellation token, or staff login required",
+          });
+        }
+
+        if (!isAuthorizedStaff && booking.checkOut <= new Date()) {
+          return res.status(409).json({
+            success: false,
+            message: "This booking can no longer be cancelled online.",
           });
         }
 

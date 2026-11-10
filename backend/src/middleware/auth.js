@@ -21,6 +21,7 @@ export async function authenticate(req, res, next) {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: true,
       },
     });

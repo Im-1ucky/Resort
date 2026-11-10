@@ -38,7 +38,7 @@ function getDisplayName(room) {
   const name = room.name?.toUpperCase();
 
   if (name === "ROOM") return "Standard Room";
-  if (name === "DELUXE_TEST") return "Deluxe Room";
+  if (name === "DELUXE ROOM") return "Deluxe Room";
   if (name === "VILLA") return "Standard Villa";
   if (name === "DELUXE VILLA") return "Deluxe Villa";
 
@@ -53,7 +53,7 @@ const localRoomImages = {
     "/images/rooms/standardroom/3.jpg",
   ],
 
-  DELUXE_TEST: [
+  "DELUXE ROOM": [
     "/images/rooms/deluxeroom/1.jpg",
     "/images/rooms/deluxeroom/2.png",
     "/images/rooms/deluxeroom/3.png",

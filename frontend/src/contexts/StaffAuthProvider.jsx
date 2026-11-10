@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -43,11 +42,16 @@ export function StaffAuthProvider({ children }) {
 
     setUser(data.user);
 
-    if (data.user?.role === "ADMIN") {
-      router.replace("/staff/admin");
-    } else {
-      router.replace("/staff/dashboard");
-    }
+    return data.user;
+  }
+
+  async function register(email, password) {
+    const data = await apiFetch("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+
+    setUser(data.user);
 
     return data.user;
   }
@@ -63,7 +67,14 @@ export function StaffAuthProvider({ children }) {
 
   return (
     <StaffAuthContext.Provider
-      value={{ user, loading, login, logout, refreshUser }}
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        refreshUser,
+      }}
     >
       {children}
     </StaffAuthContext.Provider>

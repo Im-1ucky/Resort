@@ -14,15 +14,41 @@ function StaffGuard({ children }) {
   const { user, loading } = useStaffAuth();
 
   const isLoginPage = pathname === "/staff/login";
+  const role = user?.role?.toUpperCase();
 
   useEffect(() => {
     if (loading) return;
 
-    if (!user && !isLoginPage) router.replace("/staff/login");
-    if (user && isLoginPage) router.replace("/staff/dashboard");
-  }, [user, loading, isLoginPage, router]);
+    if (!user) {
+      if (!isLoginPage) router.replace("/staff/login");
+      return;
+    }
 
-  if (loading || (!user && !isLoginPage) || (user && isLoginPage)) {
+    if (role === "GUEST") {
+      if (isLoginPage || pathname.startsWith("/staff")) {
+        router.replace(
+          !user.name || user.name === "Guest"
+            ? "/complete-profile"
+            : "/my-bookings"
+        );
+      }
+      return;
+    }
+
+    if (isLoginPage) {
+      router.replace(
+        role === "ADMIN" ? "/staff/admin" : "/staff/dashboard"
+      );
+    }
+  }, [user, loading, isLoginPage, pathname, role, router]);
+
+  const shouldRedirect =
+    loading ||
+    (!user && !isLoginPage) ||
+    (user && role === "GUEST") ||
+    (user && isLoginPage);
+
+  if (shouldRedirect) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-sm text-sage">
         <span className="size-7 animate-spin rounded-full border-2 border-[#d9ded5] border-t-forest" />
@@ -35,9 +61,5 @@ function StaffGuard({ children }) {
 }
 
 export default function StaffLayout({ children }) {
-  return (
-    <StaffAuthProvider>
-      <StaffGuard>{children}</StaffGuard>
-    </StaffAuthProvider>
-  );
+  return <StaffGuard>{children}</StaffGuard>;
 }

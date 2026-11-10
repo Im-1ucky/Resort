@@ -244,7 +244,7 @@ function PaymentContent() {
 
           <a
             href="/"
-            className="mt-7 inline-block rounded-full bg-[var(--forest)] px-7 py-3 text-sm text-white"
+            className="mt-7 inline-flex items-center justify-center rounded-full bg-[#382F27] px-7 py-3 text-sm font-semibold !text-white transition-colors hover:bg-[#241C17]"
           >
             Back to home
           </a>

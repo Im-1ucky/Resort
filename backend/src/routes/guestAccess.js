@@ -1,4 +1,4 @@
-
+import { authenticate, authorize } from "../middleware/auth.js"
 import express from "express";
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
@@ -20,6 +20,25 @@ const otpVerifyLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+const identifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Prevent excessive booking-history requests.
+const bookingsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many booking requests. Please try again later.",
+  },
 });
 
 const requestSchema = z.object({
@@ -48,8 +67,10 @@ function safeEqual(a, b) {
   const left = Buffer.from(a, "hex");
   const right = Buffer.from(b, "hex");
 
-  return left.length === right.length &&
-    crypto.timingSafeEqual(left, right);
+  return (
+    left.length === right.length &&
+    crypto.timingSafeEqual(left, right)
+  );
 }
 
 function guestTokenAuth(req, res, next) {
@@ -115,11 +136,11 @@ router.post("/otp/request", otpRequestLimiter, async (req, res) => {
       select: { id: true },
     });
 
-    // Always return the same public message.
     if (!booking) {
       return res.json({
         success: true,
-        message: "If bookings exist for these details, an OTP has been generated.",
+        message:
+          "If bookings exist for these details, an OTP has been generated.",
       });
     }
 
@@ -141,10 +162,10 @@ router.post("/otp/request", otpRequestLimiter, async (req, res) => {
 
     const response = {
       success: true,
-      message: "If bookings exist for these details, an OTP has been generated.",
+      message:
+        "If bookings exist for these details, an OTP has been generated.",
     };
 
-    // Simulated delivery for local/demo use only.
     if (process.env.NODE_ENV !== "production") {
       response.demoOtp = otp;
     }
@@ -152,6 +173,7 @@ router.post("/otp/request", otpRequestLimiter, async (req, res) => {
     return res.json(response);
   } catch (error) {
     console.error("Guest OTP request failed:", error);
+
     return res.status(500).json({
       success: false,
       message: "Unable to process OTP request",
@@ -159,17 +181,13 @@ router.post("/otp/request", otpRequestLimiter, async (req, res) => {
   }
 });
 
-const identifyLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
+// IDENTIFY ACCOUNT TYPE
 router.post("/identify", identifyLimiter, async (req, res) => {
-  const parsed = z.object({
-    email: z.string().trim().email().max(254),
-  }).safeParse(req.body);
+  const parsed = z
+    .object({
+      email: z.string().trim().email().max(254),
+    })
+    .safeParse(req.body);
 
   if (!parsed.success) {
     return res.status(400).json({
@@ -196,6 +214,7 @@ router.post("/identify", identifyLimiter, async (req, res) => {
     });
   } catch (error) {
     console.error("Account identification failed:", error);
+
     return res.status(500).json({
       success: false,
       message: "Unable to continue. Please try again.",
@@ -234,7 +253,6 @@ router.post("/otp/verify", otpVerifyLimiter, async (req, res) => {
       });
     }
 
-    // Count every verification attempt.
     await prisma.guestOtpChallenge.update({
       where: { id: challenge.id },
       data: { attempts: { increment: 1 } },
@@ -274,6 +292,7 @@ router.post("/otp/verify", otpVerifyLimiter, async (req, res) => {
     });
   } catch (error) {
     console.error("Guest OTP verification failed:", error);
+
     return res.status(500).json({
       success: false,
       message: "Unable to verify OTP",
@@ -281,57 +300,56 @@ router.post("/otp/verify", otpVerifyLimiter, async (req, res) => {
   }
 });
 
-// VIEW VERIFIED GUEST BOOKINGS
-router.get("/bookings", guestTokenAuth, async (req, res) => {
-  try {
-    const identifier = req.guestIdentifier;
-    const isEmail = identifier.includes("@");
-
-    const bookings = await prisma.booking.findMany({
-      where: isEmail
-        ? {
-            guestEmail: {
-              equals: identifier,
-              mode: "insensitive",
-            },
-          }
-        : { guestPhone: identifier },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        guestName: true,
-        checkIn: true,
-        checkOut: true,
-        adults: true,
-        children: true,
-        subtotal: true,
-        gstAmount: true,
-        totalAmount: true,
-        status: true,
-        createdAt: true,
-        items: {
-          select: {
-            quantity: true,
-            totalAmount: true,
-            roomType: {
-              select: { name: true },
+// GET /api/guest/bookings
+// Uses the authenticated HTTP-only session cookie.
+// VIEW BOOKINGS FOR THE LOGGED-IN GUEST
+router.get(
+  "/bookings",
+  authenticate,
+  authorize("GUEST"),
+  async (req, res) => {
+    try {
+      const bookings = await prisma.booking.findMany({
+        where: {
+          guestEmail: {
+            equals: req.user.email,
+            mode: "insensitive",
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          guestName: true,
+          checkIn: true,
+          checkOut: true,
+          adults: true,
+          children: true,
+          subtotal: true,
+          gstAmount: true,
+          totalAmount: true,
+          status: true,
+          createdAt: true,
+          items: {
+            select: {
+              quantity: true,
+              totalAmount: true,
+              roomType: {
+                select: { name: true },
+              },
             },
           },
         },
-      },
-    });
+      });
 
-    return res.json({
-      success: true,
-      bookings,
-    });
-  } catch (error) {
-    console.error("Guest booking lookup failed:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Unable to retrieve bookings",
-    });
+      return res.json({ success: true, bookings });
+    } catch (error) {
+      console.error("Guest booking lookup failed:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to retrieve bookings",
+      });
+    }
   }
-});
+);
 
 export default router;

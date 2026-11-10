@@ -7,7 +7,7 @@ function getVariant(room) {
   const name = room.name?.toUpperCase();
 
   if (name === "DELUXE VILLA" || name === "VILLA") return "villa";
-  if (name === "DELUXE_TEST") return "deluxe";
+  if (name === "DELUXE ROOM") return "deluxe";
 
   return "standard";
 }
@@ -28,7 +28,7 @@ function getDisplayName(room) {
   const name = room.name?.toUpperCase();
 
   if (name === "ROOM") return "Standard Room";
-  if (name === "DELUXE_TEST") return "Deluxe Room";
+  if (name === "DELUXE ROOM") return "Deluxe Room";
   if (name === "VILLA") return "Standard Villa";
   if (name === "DELUXE VILLA") return "Deluxe Villa";
 
@@ -38,7 +38,7 @@ function getDisplayName(room) {
 // Local images are prioritized over database images.
 const localRoomImages = {
   ROOM: ["/images/rooms/standardroom/1.jpg"],
-  DELUXE_TEST: ["/images/rooms/deluxeroom/1.jpg"],
+  "DELUXE ROOM": ["/images/rooms/deluxeroom/1.jpg"],
   VILLA: ["/images/rooms/standardvilla/1.jpg"],
   "DELUXE VILLA": ["/images/rooms/deluxevilla/1.jpg"],
 };

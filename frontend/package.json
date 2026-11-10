@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "run:dev": "next dev",
     "build": "next build",
     "lint": "oxlint",
     "start": "next start"
