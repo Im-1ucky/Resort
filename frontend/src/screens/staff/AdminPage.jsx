@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -20,15 +19,18 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  TicketPercent,
 } from "lucide-react";
 import { apiFetch } from "@/services/api";
 import { useStaffAuth } from "@/contexts/StaffAuthProvider";
 import EnquiryInbox from "@/components/staff/EnquiryInbox";
+import PromoCodes from "@/components/staff/PromoCodes";
 
 const navigation = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "inventory", label: "Room inventory", icon: BedDouble },
   { id: "enquiries", label: "Enquiries", icon: Inbox },
+  { id: "promos", label: "Promo codes", icon: TicketPercent },
 ];
 
 function formatCurrency(value) {
@@ -705,10 +707,12 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </div>
-        ) : activeSection === "enquiries" ? (
-          <EnquiryInbox showRefresh={false} />
-        ) : (
-          <div className="mt-8 space-y-10">
+          ) : activeSection === "enquiries" ? (
+            <EnquiryInbox showRefresh={false} />
+          ) : activeSection === "promos" ? (
+            <PromoCodes />
+          ) : (
+            <div className="mt-8 space-y-10">
             {/* Room categories */}
             <section>
               <div className="mb-5">

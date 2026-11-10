@@ -182,4 +182,56 @@ router.post(
   }
 );
 
+// Enable or disable a promo code
+router.patch(
+  "/:id/status",
+  authenticate,
+  authorize("ADMIN"),
+  async (req, res) => {
+    try {
+      const schema = z.object({
+        isActive: z.boolean(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid promo status",
+        });
+      }
+
+      const result = await prisma.promoCode.updateMany({
+        where: { id: req.params.id },
+        data: { isActive: parsed.data.isActive },
+      });
+
+      if (result.count === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Promo code not found",
+        });
+      }
+
+      const promo = await prisma.promoCode.findUnique({
+        where: { id: req.params.id },
+      });
+
+      return res.json({
+        success: true,
+        message: `Promo code ${promo.isActive ? "enabled" : "disabled"} successfully`,
+        promo,
+      });
+    } catch (error) {
+      console.error("Update promo status error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+);
+
 export default router;

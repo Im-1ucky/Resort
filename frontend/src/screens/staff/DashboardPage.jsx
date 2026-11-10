@@ -15,9 +15,9 @@ export default function StaffDashboardPage() {
       <header className="flex flex-col justify-between gap-6 border-b border-[#dedbd2] pb-8 sm:flex-row sm:items-center">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.back()}
-            title="Go back"
-            aria-label="Go back"
+            onClick={() => router.push("/")}
+            title="Go to homepage"
+            aria-label="Go to homepage"
             className="grid size-11 shrink-0 place-items-center rounded-full bg-transparent text-coffee transition hover:bg-white"
           >
             <ArrowLeft size={18} />

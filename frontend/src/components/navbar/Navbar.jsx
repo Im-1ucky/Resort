@@ -4,53 +4,21 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/services/api";
 import { UserRound, LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function Navbar() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const router = useRouter();
-
   const pathname = usePathname();
-
-  if (
-    pathname === "/staff/login" ||
-    pathname === "/complete-profile" ||
-    pathname === "/booking" ||
-    pathname === "/payment" ||
-    pathname.startsWith("/payment/")
-  ) {
-    return null;
-  }
-
-  async function handleLogout() {
-    try {
-      // Clear the authentication cookie for every role, including guests.
-      await apiFetch("/auth/logout", {
-        method: "POST",
-      });
-    } catch (error) {
-      console.error("Logout failed:", error);
-    } finally {
-      // Clear legacy guest session data too.
-      sessionStorage.removeItem("guestToken");
-      sessionStorage.removeItem("guestIdentifier");
-
-      setUser(null);
-      window.dispatchEvent(new Event("guest-auth-changed"));
-      router.replace("/");
-    }
-  }
 
   const checkSession = useCallback(async () => {
     try {
       const data = await apiFetch("/auth/me");
-      setUser(data.user ?? data);
+      setUser(data.user ?? null);
     } catch {
-      const guestToken = sessionStorage.getItem("guestToken");
-      setUser(guestToken ? { role: "GUEST" } : null);
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -65,6 +33,33 @@ export default function Navbar() {
       window.removeEventListener("guest-auth-changed", checkSession);
     };
   }, [checkSession]);
+
+  async function handleLogout() {
+    try {
+      await apiFetch("/auth/logout", {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error("Logout failed:", error);
+    } finally {
+      setUser(null);
+      window.dispatchEvent(new Event("guest-auth-changed"));
+      router.replace("/");
+    }
+  }
+
+  const hiddenRoutes = [
+    "/staff/login",
+    "/complete-profile",
+    "/booking",
+    "/payment",
+  ];
+
+  const shouldHide =
+    hiddenRoutes.includes(pathname) ||
+    pathname.startsWith("/payment/");
+
+  if (shouldHide) return null;
 
   const role = user?.role?.toUpperCase();
 
