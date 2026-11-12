@@ -302,7 +302,7 @@ export default function ExpandedEventCard({
 
         {/* Event description */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-5 pb-2 sm:px-8 sm:pt-8 sm:pb-2 lg:px-9">
-          <h2 className="font-display text-2xl text-[#203c30] sm:text-4xl">
+          <h2 className="font-display text-2xl text-forest sm:text-4xl">
             {event.title}
           </h2>
 
@@ -316,7 +316,7 @@ export default function ExpandedEventCard({
           <button
             type="button"
             onClick={() => onEnquire?.(event)}
-            className="flex items-center justify-center gap-3 rounded-md bg-[#382F27] px-7 py-3.5 text-[10px] font-semibold tracking-[0.16em] text-[#F5F2EA] transition hover:bg-[#241C17]"
+            className="flex items-center justify-center gap-3 rounded-md bg-forest px-7 py-3.5 text-[10px] font-semibold tracking-[0.16em] text-[#F5F2EA] transition hover:bg-forest-light"
           >
             <MessageCircle size={17} strokeWidth={1.7} />
             ENQUIRE

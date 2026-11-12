@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -113,7 +112,7 @@ export default function RoomCard({ room, onSelect, price }) {
 
       {/* Room details */}
       <div className="flex flex-1 flex-col px-5 pb-4 pt-3 sm:px-6 sm:pb-5 sm:pt-3">
-        <h3 className="font-display text-3xl leading-none text-[#263b30]">
+        <h3 className="font-display text-3xl leading-none text-forest">
           {getDisplayName(room)}
         </h3>
 
@@ -123,7 +122,7 @@ export default function RoomCard({ room, onSelect, price }) {
             <p className="text-[10px] tracking-[0.15em] text-[#968d80]">
               MAXIMUM GUESTS
             </p>
-            <p className="mt-1 text-sm font-medium text-[#263b30]">
+            <p className="mt-1 text-sm font-medium text-forest">
               Up to {room.maxGuests} Guests
             </p>
           </div>
@@ -132,7 +131,7 @@ export default function RoomCard({ room, onSelect, price }) {
             <p className="text-[10px] tracking-[0.15em] text-[#968d80]">
               ROOM AREA
             </p>
-            <p className="mt-1 text-sm font-medium text-[#263b30]">
+            <p className="mt-1 text-sm font-medium text-forest">
               {room.area ? `${room.area} sq. ft.` : "Not specified"}
             </p>
           </div>
@@ -145,7 +144,7 @@ export default function RoomCard({ room, onSelect, price }) {
               STARTING FROM
             </p>
 
-            <p className="mt-1 font-display text-2xl text-[#263b30]">
+            <p className="mt-1 font-display text-2xl text-forest">
               {price != null
                 ? `₹${Math.round(price).toLocaleString("en-IN")}`
                 : "—"}
@@ -156,7 +155,7 @@ export default function RoomCard({ room, onSelect, price }) {
             </p>
           </div>
 
-          <span className="whitespace-nowrap rounded-lg bg-[#263b30] px-6 py-3 text-sm font-medium text-white transition-colors group-hover:bg-[#405a47]">
+          <span className="whitespace-nowrap rounded-lg bg-forest px-6 py-3 text-sm font-medium text-white transition-colors group-hover:bg-forest-light">
             Book Now
           </span>
         </div>

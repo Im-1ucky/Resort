@@ -1,0 +1,98 @@
+export const activities = [
+  {
+    id: "mullayanagiri",
+    title: "Mullayanagiri Peak",
+    latitude: 13.39092,
+    longitude: 75.7214,
+    x: 39,
+    y: 45,
+    image: "/images/activities/mullayanagiri.jpg",
+    description:
+      "Standing at 1,930 metres, Mullayanagiri is the highest peak in Karnataka. Enjoy sweeping views of the Western Ghats, cool mountain air and a scenic climb to the Shiva temple at the summit. The final stretch involves climbing stone steps.",
+    price: "Free entry.",
+  },
+  {
+    id: "baba-budangiri",
+    title: "Baba Budangiri",
+    latitude: 13.4211,
+    longitude: 75.7607,
+    x: 42,
+    y: 40,
+    image: "/images/activities/baba-budangiri.jpg",
+    description:
+      "Explore the scenic Baba Budangiri mountain range, known for its mist covered peaks, winding roads and spiritual significance. The region is associated with the introduction of coffee cultivation to India and is home to the Dattatreya Peetha shrine.",
+    price: "Free entry.",
+  },
+  {
+    id: "manikyadhara",
+    title: "Manikyadhara Falls",
+    latitude: 13.4222,
+    longitude: 75.7698,
+    x: 47,
+    y: 37,
+    image: "/images/activities/manikyadhara.jpg",
+    description:
+      "A beautiful waterfall nestled in the Baba Budangiri hills, Manikyadhara is known for its refreshing cascade and spiritual importance. Visitors can enjoy the cool mountain atmosphere and scenic surroundings. It is commonly combined with a visit to Baba Budangiri. Generally accessible from 6 AM to 6 PM.",
+    price: "Free entry.",
+  },
+  {
+    id: "hirekolale",
+    title: "Hirekolale Lake",
+    latitude: 13.3586,
+    longitude: 75.7084,
+    x: 34,
+    y: 51,
+    image: "/images/activities/hirekolale.jpg",
+    description:
+      "Surrounded by rolling hills and lush greenery, Hirekolale Lake offers a peaceful escape from the bustle of the town. Its calm waters create beautiful reflections of the surrounding mountains, making it a favourite spot for photography, leisurely walks and relaxing evenings. Generally accessible from 6 AM to 6 PM.",
+    price: "Free entry, boating may cost around ₹50–₹100.",
+  },
+  {
+    id: "jhari-falls",
+    title: "Jhari Falls",
+    latitude: 13.42363,
+    longitude: 75.74098,
+    x: 41,
+    y: 36,
+    image: "/images/activities/jhari-falls.jpeg",
+    description:
+      "Also known as Buttermilk Falls, Jhari is a picturesque cascade flowing over rocky slopes amid dense greenery. Its white, frothy water and forest surroundings make it a memorable nature escape. The final approach passes through a coffee estate and usually requires a local 4x4 jeep.",
+    price: "Free entry.",
+  },
+  {
+    id: "kemmanagundi",
+    title: "Kemmanagundi",
+    latitude: 13.5473,
+    longitude: 75.7529,
+    x: 46,
+    y: 30,
+    image: "/images/activities/kemmanagundi.jpg",
+    description:
+      "A charming hill station surrounded by thick forests, mountain streams and beautiful valley views. Kemmanagundi is known for its pleasant climate, ornamental gardens and scenic viewpoints. Take a relaxing walk through the gardens or explore the surrounding mountain trails.",
+    price: "Entry is free, garden entry may cost around ₹15-₹20.",
+  },
+  {
+    id: "z-point",
+    title: "Z Point",
+    latitude: 13.55406,
+    longitude: 75.76354,
+    x: 48,
+    y: 29,
+    image: "/images/activities/z-point.jpg",
+    description:
+      "One of the most spectacular viewpoints near Kemmanagundi, Z Point offers breathtaking views of the Shola grasslands, deep valleys and surrounding Western Ghats. Reach the viewpoint through a scenic walking trail, with the final stretch rewarding visitors with panoramic mountain scenery.",
+    price: "Generally free.",
+  },
+  {
+    id: "hebbe-falls",
+    title: "Hebbe Falls",
+    latitude: 13.5414,
+    longitude: 75.72537,
+    x: 44,
+    y: 33,
+    image: "/images/activities/hebbe-falls.jpg",
+    description:
+      "Hidden within the forests near Kemmanagundi, Hebbe Falls plunges approximately 168 metres in two dramatic stages known as Dodda Hebbe and Chikka Hebbe. Reaching the falls is an adventure in itself, involving an authorised forest jeep ride followed by a short walk.",
+    price: "Approximately ₹50 entry.",
+  },
+];
