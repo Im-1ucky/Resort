@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useBooking } from "@/contexts/BookingProvider";
 import { apiFetch } from "@/services/api";
-import RoomCard from "./RoomCard";
+import RoomCard from "../../../components/rooms/RoomCard";
 import ExpandedRoomCard from "@/components/rooms/ExpandedRoomCard";
 
 function toDateString(value) {
@@ -151,7 +150,7 @@ export default function RoomShowcase() {
     : null;
 
   return (
-    <section className="overflow-hidden bg-[#f5f2eb] pt-2 pb-16 sm:pt-8 sm:pb-20">
+    <section className="overflow-hidden bg-[#f5f2eb] pt-1 pb-8 sm:pt-4 sm:pb-10">
       <div className="mx-auto max-w-[1600px]">
         {/* Heading */}
         <div className="mb-4 px-6 sm:px-12 lg:px-0">

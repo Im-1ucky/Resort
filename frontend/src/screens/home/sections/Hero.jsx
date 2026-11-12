@@ -37,7 +37,7 @@ export default function Hero() {
       </section>
 
       {/* Booking bar below hero */}
-      <section className="relative z-30 w-full px-4 pt-8 pb-0 sm:px-8 sm:pt-10">
+      <section className="relative z-30 min-h-[90px] w-full px-4 pt-8 pb-0 sm:min-h-[104px] sm:px-8 sm:pt-10">
         <BookingBar placement="hero" />
       </section>
     </>

@@ -1,7 +1,7 @@
-
 import Navbar from "@/components/navbar/Navbar";
 import Hero from "./sections/Hero";
-import RoomShowcase from "@/components/rooms/RoomShowcase";
+import RoomShowcase from "@/screens/home/sections/RoomShowcase";
+import EventsSection from "@/screens/home/sections/EventsSection";
 
 export default function Home() {
   return (
@@ -11,6 +11,7 @@ export default function Home() {
       <main>
         <Hero />
         <RoomShowcase />
+        <EventsSection />
       </main>
     </>
   );

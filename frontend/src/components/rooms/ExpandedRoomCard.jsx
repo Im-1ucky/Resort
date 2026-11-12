@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -117,9 +116,7 @@ const inputClass =
 const labelClass =
   "mb-1 block text-[9px] font-medium uppercase tracking-wider text-[#8b8578]";
 
-/* -------------------------------------------------------------------------- */
-/*                         Full-screen image lightbox                         */
-/* -------------------------------------------------------------------------- */
+//Full-screen image lightbox
 
 function RoomImageLightbox({
   images,
@@ -143,7 +140,6 @@ function RoomImageLightbox({
 
   const [activeIndex, setActiveIndex] = useState(startIndex);
 
-  // Start at the image that was clicked.
   useEffect(() => {
     if (!emblaApi) return;
 
@@ -151,7 +147,6 @@ function RoomImageLightbox({
     setActiveIndex(startIndex);
   }, [emblaApi, startIndex]);
 
-  // Keep the image counter synchronized.
   useEffect(() => {
     if (!emblaApi) return;
 
@@ -167,12 +162,10 @@ function RoomImageLightbox({
     };
   }, [emblaApi]);
 
-  // Keyboard controls.
   useEffect(() => {
     function handleKeyDown(event) {
       if (event.key === "Escape") {
         onClose();
-        return;
       }
 
       if (!emblaApi) return;
@@ -202,7 +195,6 @@ function RoomImageLightbox({
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 p-3 sm:p-6"
       onClick={onClose}
     >
-      {/* Close button */}
       <button
         type="button"
         onClick={(event) => {
@@ -230,13 +222,35 @@ function RoomImageLightbox({
               <img
                 src={image}
                 alt={`${roomName} ${index + 1}`}
-                draggable="false"
+                draggable={false}
                 className="max-h-full max-w-full select-none object-contain"
               />
             </div>
           ))}
         </div>
       </div>
+
+      {/* Fullscreen pagination dots */}
+      {images.length > 1 && (
+        <div className="absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 gap-2">
+          {images.map((_, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                emblaApi?.scrollTo(index);
+              }}
+              aria-label={`View image ${index + 1}`}
+              className={`h-2 rounded-full transition-all ${
+                activeIndex === index
+                  ? "w-6 bg-white"
+                  : "w-2 bg-white/50"
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

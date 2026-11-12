@@ -1,4 +1,3 @@
-
 "use client";
 
 import { MessageCircle, X, Check } from "lucide-react";
@@ -10,6 +9,8 @@ export default function FloatingEnquiry() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [enquirySubject, setEnquirySubject] = useState("Website enquiry");
+  const [isEventOpen, setIsEventOpen] = useState(false);
 
   const panelRef = useRef(null);
 
@@ -19,6 +20,46 @@ export default function FloatingEnquiry() {
     guestPhone: "",
     content: "",
   });
+
+  // Open enquiry panel with optional event details.
+  useEffect(() => {
+    function handleOpenEnquiry(event) {
+      const eventTitle = event.detail?.eventTitle;
+
+      setEnquirySubject(
+        eventTitle ? `${eventTitle} enquiry` : "Website enquiry",
+      );
+
+      setForm((previous) => ({
+        ...previous,
+        content: eventTitle
+          ? `I'm interested in enquiring about ${eventTitle} at The Estate.\n\n`
+          : previous.content,
+      }));
+
+      setError("");
+      setSuccess(false);
+      setIsOpen(true);
+    }
+
+    window.addEventListener("open-enquiry", handleOpenEnquiry);
+
+    return () => {
+      window.removeEventListener("open-enquiry", handleOpenEnquiry);
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleEventModal(event) {
+      setIsEventOpen(event.detail?.open ?? false);
+    }
+
+    window.addEventListener("event-modal-state", handleEventModal);
+
+    return () => {
+      window.removeEventListener("event-modal-state", handleEventModal);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -67,7 +108,7 @@ export default function FloatingEnquiry() {
         method: "POST",
         body: JSON.stringify({
           ...form,
-          subject: "Website enquiry",
+          subject: enquirySubject,
           guestPhone: form.guestPhone.trim() || undefined,
         }),
       });
@@ -80,6 +121,8 @@ export default function FloatingEnquiry() {
         guestPhone: "",
         content: "",
       });
+
+      setEnquirySubject("Website enquiry");
     } catch (err) {
       setError(err.message || "Unable to send your enquiry.");
     } finally {
@@ -91,7 +134,6 @@ export default function FloatingEnquiry() {
     <div ref={panelRef} className="fixed bottom-6 right-6 z-[110]">
       {isOpen && (
         <div className="absolute bottom-16 right-0 w-[calc(100vw-3rem)] max-w-[380px] overflow-hidden rounded-xl border border-[#D8CFC1] bg-[#F5F2EA] text-[#382F27] shadow-2xl">
-
           <div className="max-h-[70vh] overflow-y-auto p-5">
             {success ? (
               <div className="py-8 text-center">
@@ -208,19 +250,21 @@ export default function FloatingEnquiry() {
       )}
 
       {/* Floating button */}
-      <button
-        type="button"
-        onClick={() => setIsOpen((previous) => !previous)}
-        aria-expanded={isOpen}
-        aria-label={isOpen ? "Close enquiry" : "Open enquiry"}
-        className="flex items-center gap-3 rounded-full border border-[#F5F2EA]/40 bg-[#382F27] px-6 py-4 text-[#F5F2EA] shadow-xl transition hover:bg-[#241C17]"
-      >
-        <MessageCircle size={19} strokeWidth={1.6} />
+      {!isEventOpen && (
+        <button
+          type="button"
+          onClick={() => setIsOpen((previous) => !previous)}
+          aria-expanded={isOpen}
+          aria-label={isOpen ? "Close enquiry" : "Open enquiry"}
+          className="flex items-center gap-3 rounded-full border border-[#F5F2EA]/40 bg-[#382F27] px-6 py-4 text-[#F5F2EA] shadow-xl transition hover:bg-[#241C17]"
+        >
+          <MessageCircle size={19} strokeWidth={1.6} />
 
-        <span className="text-[10px] font-semibold tracking-[0.16em]">
-          {isOpen ? "CLOSE" : "ENQUIRE NOW"}
-        </span>
-      </button>
+          <span className="text-[10px] font-semibold tracking-[0.16em]">
+            {isOpen ? "CLOSE" : "ENQUIRE NOW"}
+          </span>
+        </button>
+      )}
     </div>
   );
 }
