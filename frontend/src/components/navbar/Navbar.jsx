@@ -81,18 +81,18 @@ export default function Navbar() {
 
   return (
     <header className="absolute inset-x-0 top-0 z-50 w-full">
-      <div className="flex h-[60px] w-full items-center justify-between bg-cream pl-3 pr-3 sm:h-[72px] sm:pl-10 sm:pr-6 lg:pl-14 lg:pr-10">
+      <div className="flex h-[60px] w-full items-center justify-between bg-cream px-3 sm:h-[72px] sm:px-6 lg:px-10">
         <Link
           href="/"
-          className="flex min-w-0 shrink items-center gap-2 text-[#332A23] sm:gap-3"
+          className="relative -left-10 flex min-w-0 shrink items-center gap-2 text-[#332A23] sm:gap-3"
         >
           <img
             src="/images/logo/logo.svg"
-            alt="The Estate mountain logo"
+            alt="The Estate"
             className="h-10 w-14 shrink-0 object-contain sm:h-13 sm:w-38"
           />
 
-          <div className="flex min-w-0 flex-col justify-center gap-1">
+          <div className="-ml-4 flex min-w-0 flex-col justify-center gap-1 sm:-ml-7">
             <span className="whitespace-nowrap font-display text-sm leading-none tracking-[0.12em] sm:text-[23px] sm:tracking-[0.16em]">
               THE ESTATE
             </span>
