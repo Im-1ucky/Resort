@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, MapPinned, ExternalLink } from "lucide-react";
+import { MapPinned } from "lucide-react";
 import { activities } from "../data/activities";
 import ActivityMarker from "@/components/activities/ActivityMarker";
 
@@ -13,15 +13,15 @@ export default function ActivitiesSection() {
     : "#";
 
   return (
-    <section className="overflow-hidden bg-[#f5f2eb] -mt-5 pt-0 pb-16 sm:pb-20">
+    <section className="overflow-hidden bg-ivory pt-0 pb-16 sm:pb-20">
       <div className="mx-auto max-w-[1600px]">
         <div className="mb-4 px-6 sm:px-12 lg:px-0">
           <p className="text-[13px] font-semibold tracking-[0.22em] text-[#9a7658]">
-            EXPLORE THE SURROUNDINGS
+            EXPLORE THE ESCAPE
           </p>
 
-          <h2 className="mt-2 whitespace-nowrap font-display text-3xl leading-tight text-[#263b30] sm:text-4xl lg:text-[42px]">
-            Beyond the <span className="italic">Estate.</span>
+          <h2 className="mt-2 whitespace-nowrap font-display text-3xl leading-tight text-forest sm:text-4xl lg:text-[42px]">
+            The beauty beyond <span className="italic">your stay.</span>
           </h2>
         </div>
 
