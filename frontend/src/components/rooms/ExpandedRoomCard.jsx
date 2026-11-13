@@ -8,6 +8,7 @@ import {
   formatApiDate,
 } from "@/utils/date";
 import { useBooking } from "@/contexts/BookingProvider";
+import { apiFetch } from "@/services/api";
 import useEmblaCarousel from "embla-carousel-react";
 import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import {
@@ -271,6 +272,10 @@ export default function ExpandedRoomCard({ room, onClose }) {
 
   const [activeImage, setActiveImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState("");
 
   const [checkInInput, setCheckInInput] = useState(
     formatIndianDate(checkIn)
@@ -299,6 +304,9 @@ export default function ExpandedRoomCard({ room, onClose }) {
   useEffect(() => {
     setActiveImage(0);
     setLightboxOpen(false);
+    setPromoCode("");
+    setAppliedPromo(null);
+    setPromoError("");
     galleryRef.current?.scrollTo({ left: 0 });
   }, [room?.id]);
 
@@ -347,6 +355,8 @@ export default function ExpandedRoomCard({ room, onClose }) {
 
   function changeCheckIn(value) {
     if (!value) return;
+    setAppliedPromo(null);
+    setPromoError("");
 
     const nextCheckIn = new Date(`${value}T00:00:00`);
     setCheckIn(nextCheckIn);
@@ -358,6 +368,8 @@ export default function ExpandedRoomCard({ room, onClose }) {
 
   function changeCheckOut(value) {
     if (!value) return;
+    setAppliedPromo(null);
+    setPromoError("");
 
     const nextCheckOut = new Date(`${value}T00:00:00`);
 
@@ -367,6 +379,8 @@ export default function ExpandedRoomCard({ room, onClose }) {
   }
 
   function changeAdults(value) {
+    setAppliedPromo(null);
+    setPromoError("");
     const next = Math.max(
       1,
       Math.min(
@@ -379,6 +393,8 @@ export default function ExpandedRoomCard({ room, onClose }) {
   }
 
   function changeChildren(value) {
+    setAppliedPromo(null);
+    setPromoError("");
     const next = Math.max(
       0,
       Math.min(
@@ -412,6 +428,52 @@ export default function ExpandedRoomCard({ room, onClose }) {
     setLightboxOpen(true);
   }
 
+  async function handleApplyPromo() {
+    const code = promoCode.trim();
+
+    if (!code) {
+      setPromoError("Please enter a promo code.");
+      setAppliedPromo(null);
+      return;
+    }
+
+    if (total <= 0) {
+      setPromoError("The booking amount is not available yet.");
+      return;
+    }
+
+    setPromoLoading(true);
+    setPromoError("");
+    setAppliedPromo(null);
+
+    try {
+      const result = await apiFetch("/promos/validate", {
+        method: "POST",
+        body: JSON.stringify({
+          code,
+          bookingAmount: total,
+        }),
+      });
+
+      setAppliedPromo({
+        code: result.code,
+        discount: Number(result.discount),
+        finalAmount: Number(result.finalAmount),
+      });
+      setPromoCode(result.code);
+    } catch (error) {
+      setPromoError(error.message || "Unable to apply this promo code.");
+    } finally {
+      setPromoLoading(false);
+    }
+  }
+
+  function removePromo() {
+    setAppliedPromo(null);
+    setPromoCode("");
+    setPromoError("");
+  }
+
   function handleBook() {
     const params = new URLSearchParams({
       roomTypeId: room.id,
@@ -421,6 +483,10 @@ export default function ExpandedRoomCard({ room, onClose }) {
       adults: String(adults),
       children: String(childrenCount),
     });
+
+    if (appliedPromo?.code) {
+      params.set("promoCode", appliedPromo.code);
+    }
 
     window.location.href = `/booking?${params.toString()}`;
   }
@@ -576,7 +642,7 @@ export default function ExpandedRoomCard({ room, onClose }) {
               {/* Amenities */}
               {room.amenities?.length > 0 && (
                 <div className="mt-4 sm:mt-5">
-                  <h3 className="mb-3 font-display text-lg text-[#263b30] sm:text-xl">
+                  <h3 className="mb-3 font-display text-lg text-forest sm:text-xl">
                     Amenities
                   </h3>
 
@@ -610,6 +676,70 @@ export default function ExpandedRoomCard({ room, onClose }) {
                   </div>
                 </div>
               )}
+
+              {/* Promo code — placed below Amenities without changing the existing layout */}
+              <div className="mt-5 max-w-md">
+                <label
+                  htmlFor="room-promo-code"
+                  className="mb-3 font-display text-lg text-forest sm:text-xl"
+                >
+                  Have a promo code?
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    id="room-promo-code"
+                    type="text"
+                    value={promoCode}
+                    onChange={(event) => {
+                      setPromoCode(event.target.value.toUpperCase());
+                      setAppliedPromo(null);
+                      setPromoError("");
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleApplyPromo();
+                      }
+                    }}
+                    placeholder="Enter promo code"
+                    maxLength={30}
+                    disabled={promoLoading}
+                    className="h-10 min-w-0 flex-1 rounded-lg border border-[#d9dfd3] bg-white px-3 text-xs text-[#263b30] uppercase outline-none transition placeholder:normal-case placeholder:text-[#999487] focus:border-[#263b30] focus:ring-1 focus:ring-[#263b30]/10 disabled:opacity-60"
+                  />
+
+                  {appliedPromo ? (
+                    <button
+                      type="button"
+                      onClick={removePromo}
+                      className="h-10 rounded-lg border border-[#d9dfd3] px-3 text-xs font-semibold text-[#354c3d] transition hover:bg-[#e9eee5]"
+                    >
+                      Remove
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleApplyPromo}
+                      disabled={promoLoading || !promoCode.trim()}
+                      className="h-10 rounded-lg bg-[#263b30] px-4 text-xs font-semibold text-white transition hover:bg-[#354d3e] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {promoLoading ? "Applying..." : "Apply"}
+                    </button>
+                  )}
+                </div>
+
+                {promoError && (
+                  <p role="alert" className="mt-2 text-xs text-red-600">
+                    {promoError}
+                  </p>
+                )}
+
+                {appliedPromo && (
+                  <p role="status" className="mt-2 text-xs font-medium text-forest-light">
+                    Promo code applied, you save {formatPrice(appliedPromo.discount)}.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Booking and pricing panel */}
@@ -717,10 +847,17 @@ export default function ExpandedRoomCard({ room, onClose }) {
                     <span>{formatPrice(gstTotal)}</span>
                   </div>
 
+                  {appliedPromo && (
+                    <div className="flex justify-between font-medium text-[#28764b]">
+                      <span>Promo discount ({appliedPromo.code})</span>
+                      <span>−{formatPrice(appliedPromo.discount)}</span>
+                    </div>
+                  )}
+
                   <div className="border-t border-[#e5e0d6] pt-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-semibold text-[#203c30]">
+                        <p className="font-semibold text-forest">
                           Total
                         </p>
 
@@ -730,8 +867,8 @@ export default function ExpandedRoomCard({ room, onClose }) {
                         </p>
                       </div>
 
-                      <span className="font-display text-2xl font-semibold text-[#203c30]">
-                        {formatPrice(total)}
+                      <span className="font-display text-2xl font-semibold text-forest">
+                        {formatPrice(appliedPromo ? appliedPromo.finalAmount : total)}
                       </span>
                     </div>
                   </div>
@@ -742,7 +879,7 @@ export default function ExpandedRoomCard({ room, onClose }) {
               <button
                 type="button"
                 onClick={handleBook}
-                className="mt-4 h-11 w-full rounded-lg bg-[#203c30] px-5 text-sm font-medium uppercase tracking-widest text-white transition hover:bg-[#2e5141]"
+                className="mt-4 h-11 w-full rounded-lg bg-forest px-5 text-sm font-medium uppercase tracking-widest text-white transition hover:bg-[#2e5141]"
               >
                 Book Now
               </button>

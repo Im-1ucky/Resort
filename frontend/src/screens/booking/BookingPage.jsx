@@ -18,7 +18,9 @@ export default function BookingPage() {
   const roomTypeId =
     params.get("roomTypeId") || params.get("id") || "";
 
-  const [promoCode, setPromoCode] = useState("");
+  const [promoCode, setPromoCode] = useState(
+    () => params.get("promoCode") || ""
+  );
 
   const [form, setForm] = useState({
     guestName: "",
@@ -172,6 +174,7 @@ export default function BookingPage() {
         discountAmount: createdBooking.discountAmount,
         gstAmount: createdBooking.gstAmount,
         totalAmount: createdBooking.totalAmount,
+        promoCode: promoCode.trim() || null,
       };
 
       sessionStorage.setItem(
@@ -204,7 +207,7 @@ export default function BookingPage() {
         </h1>
 
         <p className="mt-3 text-gray-600">
-          Enter your details and review your stay before proceeding to payment.
+          Verify your details and review your stay before proceeding to payment.
         </p>
 
         <form

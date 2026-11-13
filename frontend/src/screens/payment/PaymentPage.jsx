@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
@@ -438,6 +437,23 @@ function PaymentContent() {
               <p className="text-gray-500">Rooms</p>
               <p className="mt-1 font-medium">{booking.quantity}</p>
             </div>
+            {booking.promoCode && (
+              <div>
+                <p className="text-gray-500">Promo code</p>
+                <p className="mt-1 font-medium text-green-700">
+                  {booking.promoCode}
+                </p>
+              </div>
+            )}
+
+            {Number(booking.discountAmount) > 0 && (
+              <div className="flex justify-between">
+                <p className="text-gray-500">Promo discount</p>
+                <p className="font-medium text-green-700">
+                  -₹{Number(booking.discountAmount).toLocaleString("en-IN")}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="mt-7 border-t border-gray-200 pt-5">
