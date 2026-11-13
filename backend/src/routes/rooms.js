@@ -2,7 +2,6 @@ import express from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { randomUUID } from "node:crypto";
 
 const router = express.Router();
 
@@ -81,6 +80,41 @@ async function lockRoomTypes(tx, ids) {
       FOR UPDATE
     `;
   }
+}
+
+async function generateRoomNumbers(tx, roomType, count) {
+  const prefix = roomType.roomPrefix;
+
+  // Check all rooms, including retired rooms and rooms in other categories.
+  // This prevents reusing numbers after a category prefix is changed.
+  const existingRooms = await tx.room.findMany({
+    where: {
+      roomNumber: {
+        startsWith: prefix,
+      },
+    },
+    select: {
+      roomNumber: true,
+    },
+  });
+
+  const highestNumber = existingRooms.reduce((max, room) => {
+    const match = room.roomNumber.match(
+      new RegExp(`^${prefix}(\\d+)$`)
+    );
+
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+
+  const firstNumber = Math.max(
+    roomType.startingNumber,
+    highestNumber + 1
+  );
+
+  return Array.from({ length: count }, (_, index) => ({
+    roomNumber: `${prefix}${firstNumber + index}`,
+    roomTypeId: roomType.id,
+  }));
 }
 
 async function lockRoom(tx, id) {
@@ -608,14 +642,15 @@ router.patch(
         if (totalUnits > currentUnits) {
           const difference = totalUnits - currentUnits;
 
-          for (let i = 0; i < difference; i++) {
-            await tx.room.create({
-              data: {
-                roomNumber: `AUTO-${roomTypeId.slice(0, 8)}-${randomUUID().slice(0, 8)}`,
-                roomTypeId,
-              },
-            });
-          }
+          const newRooms = await generateRoomNumbers(
+            tx,
+            roomType,
+            difference
+          );
+
+          await tx.room.createMany({
+            data: newRooms,
+          });
         } else if (totalUnits < currentUnits) {
           const difference = currentUnits - totalUnits;
           const candidates = [];
@@ -678,6 +713,12 @@ router.patch(
         });
       }
 
+      if (error.code === "P2002") {
+        return res.status(409).json({
+          message: "Generated room number already exists. Please retry.",
+        });
+      }
+
       console.error("Update physical units error:", error);
 
       return res.status(500).json({
@@ -704,13 +745,6 @@ router.post(
 
     const { roomTypeId, count } = parsed.data;
 
-    const prefixes = {
-      "DELUXE ROOM": "DR",
-      "DELUXE VILLA": "DV",
-      ROOM: "R",
-      VILLA: "V",
-    };
-
     try {
       const result = await prisma.$transaction(async (tx) => {
         await lockRoomTypes(tx, [roomTypeId]);
@@ -722,28 +756,11 @@ router.post(
         if (!roomType) throw new Error("ROOM_TYPE_NOT_FOUND");
         if (!roomType.isActive) throw new Error("ROOM_TYPE_INACTIVE");
 
-        const prefix = prefixes[roomType.name.toUpperCase()];
-
-        if (!prefix) throw new Error("UNKNOWN_ROOM_CATEGORY");
-
-        // Include retired rooms so their numbers are never reused.
-        const existingRooms = await tx.room.findMany({
-          where: { roomTypeId },
-          select: { roomNumber: true },
-        });
-
-        const highestNumber = existingRooms.reduce((max, room) => {
-          const match = room.roomNumber.match(
-            new RegExp(`^${prefix}(\\d+)$`)
-          );
-
-          return match ? Math.max(max, Number(match[1])) : max;
-        }, 100);
-
-        const newRooms = Array.from({ length: count }, (_, index) => ({
-          roomNumber: `${prefix}${highestNumber + index + 1}`,
-          roomTypeId,
-        }));
+        const newRooms = await generateRoomNumbers(
+          tx,
+          roomType,
+          count
+        );
 
         await tx.room.createMany({
           data: newRooms,
@@ -774,12 +791,6 @@ router.post(
       if (error.message === "ROOM_TYPE_INACTIVE") {
         return res.status(409).json({
           message: "Cannot add rooms to an inactive category",
-        });
-      }
-
-      if (error.message === "UNKNOWN_ROOM_CATEGORY") {
-        return res.status(400).json({
-          message: "No room-number prefix configured for this category",
         });
       }
 

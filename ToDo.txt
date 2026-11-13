@@ -1,3 +1,9 @@
+Backend
+1. Add Staff Management to Admin
+2. Add Dev endpoint
+
 Frontend
-1. Add Wedding and events page
-2. Contact us
+!. Make colors even
+
+Database
+1. Remove unused properties

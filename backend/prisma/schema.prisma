@@ -134,7 +134,6 @@ model RoomType {
   maxGuests        Int
   totalUnits       Int
   area             Int?
-  bedConfiguration String?
   amenities        String[] @default([])
   images           String[] @default([])
   isActive         Boolean @default(true)
@@ -144,6 +143,9 @@ model RoomType {
   allotments    WebsiteAllotment[]
   rooms         Room[]
   blackoutDates BlackoutDate[]
+
+  roomPrefix    String @unique
+  startingNumber Int   @default(101)
 }
 
 model RoomAssignment {

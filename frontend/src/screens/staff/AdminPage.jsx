@@ -108,6 +108,17 @@ export default function AdminDashboardPage() {
   const [guestValues, setGuestValues] = useState({});
   const [physicalValues, setPhysicalValues] = useState({});
 
+  const [roomTypeValues, setRoomTypeValues] = useState({});
+  const [newRoomType, setNewRoomType] = useState({
+    name: "",
+    roomPrefix: "",
+    startingNumber: "101",
+    maxGuests: "2",
+    area: "",
+    amenities: "",
+  });
+  const [savingRoomType, setSavingRoomType] = useState(false);
+
   // Booking search and pagination
   const [bookings, setBookings] = useState([]);
   const [bookingLoading, setBookingLoading] = useState(true);
@@ -154,6 +165,20 @@ export default function AdminDashboardPage() {
         types.map((type) => [
           type.id,
           String(type.maxGuests),
+        ])
+      )
+    );
+
+    setRoomTypeValues(
+      Object.fromEntries(
+        types.map((type) => [
+          type.id,
+          {
+            roomPrefix: type.roomPrefix || "",
+            startingNumber: String(type.startingNumber ?? 101),
+            area: type.area == null ? "" : String(type.area),
+            amenities: (type.amenities || []).join(", "),
+          },
         ])
       )
     );
@@ -254,6 +279,156 @@ export default function AdminDashboardPage() {
       await loadInventory();
     } catch (err) {
       console.error("Failed to update maximum guests:", err);
+    }
+  }
+
+  async function saveRoomTypeSettings(id) {
+    const values = roomTypeValues[id];
+
+    if (!values) return;
+
+    const startingNumber = Number(values.startingNumber);
+    const roomPrefix = values.roomPrefix.trim().toUpperCase();
+    const area = values.area.trim() ? Number(values.area) : null;
+
+    const amenities = values.amenities
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!/^[A-Z0-9]{1,6}$/.test(roomPrefix)) {
+      console.error("Prefix must contain 1–6 letters or numbers.");
+      return;
+    }
+
+    if (
+      !Number.isInteger(startingNumber) ||
+      startingNumber < 1 ||
+      startingNumber > 999999
+    ) {
+      console.error("Starting number must be between 1 and 999999.");
+      return;
+    }
+
+    if (
+      area !== null &&
+      (!Number.isInteger(area) || area < 1)
+    ) {
+      console.error("Room area must be a positive whole number.");
+      return;
+    }
+
+    if (
+      amenities.length > 30 ||
+      amenities.some((item) => item.length > 60)
+    ) {
+      console.error("Maximum 30 amenities, each up to 60 characters.");
+      return;
+    }
+
+    try {
+      await apiFetch(`/room-types/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          roomPrefix,
+          startingNumber,
+          area,
+          amenities,
+        }),
+      });
+
+      await loadInventory();
+    } catch (err) {
+      console.error("Failed to update room category:", err);
+    }
+  }
+
+  async function deleteRoomType(id, name) {
+    const confirmed = window.confirm(
+      `Permanently delete "${name}" and ALL its physical rooms?\n\n` +
+      "This action cannot be undone. Categories with active or historical booking records cannot be deleted."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await apiFetch(`/room-types/${id}`, {
+        method: "DELETE",
+      });
+
+      await loadInventory();
+    } catch (error) {
+      console.error("Failed to delete room category:", error);
+      window.alert(
+        error.message || "Unable to delete room category."
+      );
+    }
+  }
+
+  async function createRoomType(event) {
+    event.preventDefault();
+
+    const area = newRoomType.area.trim()
+      ? Number(newRoomType.area)
+      : null;
+
+    const amenities = newRoomType.amenities
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    const payload = {
+      ...newRoomType,
+      roomPrefix: newRoomType.roomPrefix.trim().toUpperCase(),
+      startingNumber: Number(newRoomType.startingNumber),
+      maxGuests: Number(newRoomType.maxGuests),
+      area,
+      amenities,
+    };
+
+    if (!/^[A-Z0-9]{1,6}$/.test(payload.roomPrefix)) {
+      console.error("Prefix must contain 1–6 letters or numbers.");
+      return;
+    }
+
+    if (
+      area !== null &&
+      (!Number.isInteger(area) || area < 1)
+    ) {
+      console.error("Room area must be a positive whole number.");
+      return;
+    }
+
+    if (
+      amenities.length > 30 ||
+      amenities.some((item) => item.length > 60)
+    ) {
+      console.error("Maximum 30 amenities, each up to 60 characters.");
+      return;
+    }
+
+    setSavingRoomType(true);
+
+    try {
+      await apiFetch("/room-types", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      setNewRoomType({
+        name: "",
+        roomPrefix: "",
+        startingNumber: "101",
+        maxGuests: "2",
+        area: "",
+        amenities: "",
+      });
+
+      await loadInventory();
+    } catch (err) {
+      console.error("Failed to create room category:", err);
+    } finally {
+      setSavingRoomType(false);
     }
   }
 
@@ -712,8 +887,76 @@ export default function AdminDashboardPage() {
           ) : activeSection === "promos" ? (
             <PromoCodes />
           ) : (
-            <div className="mt-8 space-y-10">
-            {/* Room categories */}
+          <div className="mt-8 space-y-10">
+
+                  {/* Create room category */}
+                  <section>
+                    <div className="mb-5">
+                      <h2 className="font-display text-2xl text-forest">
+                        Create room category
+                      </h2>
+                    </div>
+
+                    <form
+                      onSubmit={createRoomType}
+                      className="grid gap-4 border border-[#e8e4db] bg-white p-5 sm:grid-cols-2 lg:grid-cols-4"
+                    >
+                      {[
+                        ["name", "Category name", "e.g. Premium Suite"],
+                        ["roomPrefix", "Room prefix", "e.g. PS"],
+                        ["startingNumber", "Starting number", "101"],
+                        ["maxGuests", "Maximum guests", "2"],
+                        ["area", "Room area (sq. ft.)", "e.g. 450"],
+                        ["amenities", "Amenities (comma separated)", "Wi-Fi, AC, Smart TV"],
+                      ].map(([field, label, placeholder]) => (
+                        <div key={field}>
+                          <label className="mb-2 block text-xs font-semibold">
+                            {label}
+                          </label>
+                          <input
+                            required
+                            type={
+                              ["startingNumber", "maxGuests", "area"].includes(field)
+                                ? "number"
+                                : "text"
+                            }
+                            min={
+                              ["startingNumber", "maxGuests", "area"].includes(field)
+                                ? 1
+                                : undefined
+                            }
+                            max={
+                              field === "startingNumber"
+                                ? 999999
+                                : field === "maxGuests"
+                                  ? 50
+                                  : undefined
+                            }
+                            maxLength={field === "roomPrefix" ? 6 : undefined}
+                            value={newRoomType[field]}
+                            onChange={(event) =>
+                              setNewRoomType((current) => ({
+                                ...current,
+                                [field]: event.target.value,
+                              }))
+                            }
+                            placeholder={placeholder}
+                            className="h-11 w-full border border-[#dedbd2] px-3 text-sm outline-none focus:border-forest"
+                          />
+                        </div>
+                      ))}
+
+                      <button
+                        type="submit"
+                        disabled={savingRoomType}
+                        className="flex h-11 items-center justify-center gap-2 bg-forest px-5 text-xs font-semibold text-white transition hover:bg-forest-dark disabled:opacity-50 sm:col-span-2 lg:col-span-4"
+                      >
+                        <Plus size={15} />
+                        {savingRoomType ? "Creating..." : "Create category"}
+                      </button>
+                    </form>
+                  </section>
+                    {/* Room categories */}
             <section>
               <div className="mb-5">
                 <h2 className="font-display text-2xl text-forest">
@@ -726,9 +969,12 @@ export default function AdminDashboardPage() {
                   <thead className="border-b border-[#eeeae2] bg-ivory/60 text-[10px] uppercase tracking-wider text-stone-500">
                     <tr>
                       <th className="px-5 py-4">Room category</th>
+                      <th className="px-5 py-4">Area / Amenities</th>
+                      <th className="px-5 py-4">Prefix / Room number</th>
                       <th className="px-5 py-4">Physical units</th>
                       <th className="px-5 py-4">Maximum guests</th>
                       <th className="px-5 py-4">Action</th>
+                      <th className="px-5 py-4 text-center">Delete</th>
                     </tr>
                   </thead>
 
@@ -753,6 +999,87 @@ export default function AdminDashboardPage() {
                             <p className="mt-1 text-[10px] text-stone-400">
                               {type.isActive ? "Active" : "Inactive"}
                             </p>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <div className="space-y-2">
+                              <input
+                                type="number"
+                                min="1"
+                                placeholder="Area in sq. ft."
+                                value={roomTypeValues[type.id]?.area ?? ""}
+                                onChange={(event) =>
+                                  setRoomTypeValues((current) => ({
+                                    ...current,
+                                    [type.id]: {
+                                      ...current[type.id],
+                                      area: event.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-28 border border-[#dedbd2] px-2 py-2 text-xs outline-none focus:border-forest"
+                              />
+
+                              <input
+                                type="text"
+                                placeholder="Wi-Fi, AC, Smart TV..."
+                                value={roomTypeValues[type.id]?.amenities ?? ""}
+                                onChange={(event) =>
+                                  setRoomTypeValues((current) => ({
+                                    ...current,
+                                    [type.id]: {
+                                      ...current[type.id],
+                                      amenities: event.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-64 border border-[#dedbd2] px-2 py-2 text-xs outline-none focus:border-forest"
+                              />
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2">
+                              <input
+                                value={roomTypeValues[type.id]?.roomPrefix ?? ""}
+                                onChange={(event) =>
+                                  setRoomTypeValues((current) => ({
+                                    ...current,
+                                    [type.id]: {
+                                      ...current[type.id],
+                                      roomPrefix: event.target.value,
+                                    },
+                                  }))
+                                }
+                                maxLength={6}
+                                placeholder="DR"
+                                className="w-16 border border-[#dedbd2] px-2 py-2 text-xs uppercase outline-none focus:border-forest"
+                              />
+
+                              <input
+                                type="number"
+                                min="1"
+                                max="999999"
+                                value={roomTypeValues[type.id]?.startingNumber ?? "101"}
+                                onChange={(event) =>
+                                  setRoomTypeValues((current) => ({
+                                    ...current,
+                                    [type.id]: {
+                                      ...current[type.id],
+                                      startingNumber: event.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-20 border border-[#dedbd2] px-2 py-2 text-xs outline-none focus:border-forest"
+                              />
+
+                              <button
+                                onClick={() => saveRoomTypeSettings(type.id)}
+                                className="text-xs font-semibold text-forest hover:text-wood"
+                              >
+                                <Save size={14} />
+                              </button>
+                            </div>
                           </td>
 
                           <td className="px-5 py-4">
@@ -815,6 +1142,17 @@ export default function AdminDashboardPage() {
                                 Save guests
                               </button>
                             </div>
+                          </td>
+                          <td className="px-5 py-4 text-center align-middle">
+                            <button
+                              type="button"
+                              onClick={() => deleteRoomType(type.id, type.name)}
+                              title="Delete category"
+                              aria-label="Delete category"
+                              className="inline-flex items-center justify-center p-2 text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 size={18} />
+                            </button>
                           </td>
                         </tr>
                       );
