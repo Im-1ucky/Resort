@@ -1,50 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/services/api";
+import { useStaffAuth } from "@/contexts/StaffAuthProvider";
 import { UserRound, LogOut } from "lucide-react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 export default function Navbar() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  const router = useRouter();
   const pathname = usePathname();
-
-  const checkSession = useCallback(async () => {
-    try {
-      const data = await apiFetch("/auth/me");
-      setUser(data.user ?? null);
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkSession();
-
-    window.addEventListener("guest-auth-changed", checkSession);
-
-    return () => {
-      window.removeEventListener("guest-auth-changed", checkSession);
-    };
-  }, [checkSession]);
+  const { user, loading, logout } = useStaffAuth();
 
   async function handleLogout() {
     try {
-      await apiFetch("/auth/logout", {
-        method: "POST",
-      });
+      await logout();
     } catch (error) {
       console.error("Logout failed:", error);
-    } finally {
-      setUser(null);
-      window.dispatchEvent(new Event("guest-auth-changed"));
-      router.replace("/");
     }
   }
 
@@ -84,7 +54,7 @@ export default function Navbar() {
       <div className="flex h-[60px] w-full items-center justify-between bg-cream px-3 sm:h-[72px] sm:px-6 lg:px-10">
         <Link
           href="/"
-          className="relative -left-10 flex min-w-0 shrink items-center gap-2 text-[#332A23] sm:gap-3"
+          className="relative -left-10 flex min-w-0 shrink items-center gap-2 text-coffee sm:gap-3"
         >
           <img
             src="/images/logo/logo.svg"
