@@ -6,7 +6,7 @@ import { authenticate, authorize } from "../middleware/auth.js";
 const router = Router();
 
 router.use(authenticate);
-router.use(authorize("ADMIN", "GM", "DEV"));
+router.use(authorize("ADMIN", "GM"));
 
 router.get("/dashboard", async (req, res, next) => {
   try {

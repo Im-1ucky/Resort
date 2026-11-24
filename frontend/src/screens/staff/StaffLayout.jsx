@@ -2,29 +2,27 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  StaffAuthProvider,
-  useStaffAuth,
-} from "@/contexts/StaffAuthProvider";
+import { useStaffAuth } from "@/contexts/StaffAuthProvider";
 
 function StaffGuard({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useStaffAuth();
 
-  const isLoginPage = pathname === "/staff/login";
+  const isPublicPage =
+    pathname === "/staff/login" || pathname === "/staff/reset-password";
   const role = user?.role?.toUpperCase();
 
   useEffect(() => {
     if (loading) return;
 
     if (!user) {
-      if (!isLoginPage) router.replace("/staff/login");
+      if (!isPublicPage) router.replace("/staff/login");
       return;
     }
 
     if (role === "GUEST") {
-      if (isLoginPage || pathname.startsWith("/staff")) {
+      if (isPublicPage || pathname.startsWith("/staff")) {
         router.replace(
           !user.name || user.name === "Guest"
             ? "/complete-profile"
@@ -34,18 +32,18 @@ function StaffGuard({ children }) {
       return;
     }
 
-    if (isLoginPage) {
+    if (isPublicPage) {
       router.replace(
         role === "ADMIN" ? "/staff/admin" : "/staff/dashboard"
       );
     }
-  }, [user, loading, isLoginPage, pathname, role, router]);
+  }, [user, loading, isPublicPage, pathname, role, router]);
 
   const shouldRedirect =
     loading ||
-    (!user && !isLoginPage) ||
+    (!user && !isPublicPage) ||
     (user && role === "GUEST") ||
-    (user && isLoginPage);
+    (user && isPublicPage);
 
   if (shouldRedirect) {
     return (

@@ -310,7 +310,7 @@ const simulatePaymentSchema = z.object({
 router.post(
   "/payments/:id/simulate",
   authenticate,
-  authorize("ADMIN", "DEV"),
+  authorize("ADMIN"),
   async (req, res) => {
     if (process.env.NODE_ENV === "production") {
       return res.status(404).json({

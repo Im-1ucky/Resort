@@ -15,7 +15,6 @@ enum UserRole {
   SALES
   ADMIN
   GM
-  DEV
 }
 
 enum BookingStatus {
@@ -101,12 +100,14 @@ model User {
   passwordHash String
   phone        String?
   role         UserRole @default(GUEST)
+  isActive     Boolean  @default(true)
 
-  assignedEnquiries Enquiry[]              @relation("EnquiryAssignee")
-  enquiryMessages   EnquiryMessage[]
-  enquiryNotes      EnquiryNote[]
-  approvedDrafts    EnquiryReplyDraft[]    @relation("DraftApprover")
-  enquiryHistory    EnquiryStatusHistory[]
+  assignedEnquiries   Enquiry[]              @relation("EnquiryAssignee")
+  enquiryMessages     EnquiryMessage[]
+  enquiryNotes        EnquiryNote[]
+  approvedDrafts      EnquiryReplyDraft[]    @relation("DraftApprover")
+  enquiryHistory      EnquiryStatusHistory[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Room {
@@ -352,8 +353,8 @@ model EnquiryNote {
   enquiryId String
   enquiry   Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
 
-  authorId String
-  author   User   @relation(fields: [authorId], references: [id])
+  authorId String?
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
   content   String
   createdAt DateTime @default(now())
@@ -425,4 +426,17 @@ model AuditLog {
 
   @@index([actorId, createdAt])
   @@index([action, createdAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }

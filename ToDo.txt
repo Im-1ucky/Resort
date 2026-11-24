@@ -1,6 +1,5 @@
 Backend
 1. Add Staff Management to Admin
-2. Add Dev endpoint
 
 Frontend
 !. Make colors even

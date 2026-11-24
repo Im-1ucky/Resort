@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma.js";
 
-
 export async function authenticate(req, res, next) {
   try {
     const token = req.cookies?.token;
@@ -23,13 +22,14 @@ export async function authenticate(req, res, next) {
         email: true,
         phone: true,
         role: true,
+        isActive: true,
       },
     });
 
-    if (!user) {
+    if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
-        message: "User not found",
+        message: "Account is inactive or not found",
       });
     }
 

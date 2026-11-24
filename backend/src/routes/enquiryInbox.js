@@ -10,10 +10,10 @@ import { authenticate, authorize } from "../middleware/auth.js";
 const router = Router();
 
 router.use(authenticate);
-router.use(authorize("ADMIN", "GM", "DEV", "RESERVATIONS", "SALES"));
+router.use(authorize("ADMIN", "GM", "RESERVATIONS", "SALES"));
 
 function getEnquiryScope(user) {
-  if (["ADMIN", "GM", "DEV"].includes(user.role)) {
+  if (["ADMIN", "GM"].includes(user.role)) {
     return {};
   }
 
@@ -991,9 +991,9 @@ router.post(
   },
 );
 
-// DEV-only: permanently delete an enquiry.
+// ADMIN-only: permanently delete an enquiry.
 // DELETE /api/enquiries/:id
-router.delete("/:id", authorize("DEV"), async (req, res, next) => {
+router.delete("/:id", authorize("ADMIN"), async (req, res, next) => {
   try {
     const enquiry = await prisma.enquiry.findUnique({
       where: { id: req.params.id },

@@ -1,4 +1,3 @@
-
 import bcrypt from "bcryptjs";
 import prisma from "../src/lib/prisma.js";
 
@@ -26,12 +25,6 @@ const staffAccounts = [
     email: process.env.ADMIN_EMAIL?.trim().toLowerCase(),
     password: process.env.ADMIN_PASSWORD,
     role: "ADMIN",
-  },
-  {
-    name: "Developer",
-    email: process.env.DEV_EMAIL?.trim().toLowerCase(),
-    password: process.env.DEV_PASSWORD,
-    role: "DEV",
   },
 ];
 

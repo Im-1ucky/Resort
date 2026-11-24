@@ -20,6 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   TicketPercent,
+  UserCog,
+  KeyRound,
 } from "lucide-react";
 import { apiFetch } from "@/services/api";
 import { useStaffAuth } from "@/contexts/StaffAuthProvider";
@@ -31,6 +33,7 @@ const navigation = [
   { id: "inventory", label: "Room inventory", icon: BedDouble },
   { id: "enquiries", label: "Enquiries", icon: Inbox },
   { id: "promos", label: "Promo codes", icon: TicketPercent },
+  { id: "staff", label: "Staff", icon: UserCog },
 ];
 
 function formatCurrency(value) {
@@ -118,6 +121,34 @@ export default function AdminDashboardPage() {
     amenities: "",
   });
   const [savingRoomType, setSavingRoomType] = useState(false);
+
+  const [staffList, setStaffList] = useState([]);
+    const [staffEdits, setStaffEdits] = useState({});
+    const [newStaff, setNewStaff] = useState({
+      name: "",
+      email: "",
+      phone: "",
+      role: "RESERVATIONS",
+      password: "",
+    });
+    const [savingStaff, setSavingStaff] = useState(false);
+    const [resetTarget, setResetTarget] = useState(null);
+    const [resetPasswordValue, setResetPasswordValue] = useState("");
+    const [staffMessage, setStaffMessage] = useState({ type: "", text: "" });
+
+    const loadStaff = useCallback(async () => {
+      const data = await apiFetch("/staff");
+      const list = data.staff || [];
+      setStaffList(list);
+      setStaffEdits(
+        Object.fromEntries(
+          list.map((m) => [
+            m.id,
+            { name: m.name, email: m.email, phone: m.phone || "", role: m.role },
+          ])
+        )
+      );
+    }, []);
 
   // Booking search and pagination
   const [bookings, setBookings] = useState([]);
@@ -236,21 +267,124 @@ export default function AdminDashboardPage() {
   }, [authLoading, user, loadBookings, bookingRefreshKey]);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+      setLoading(true);
 
-    try {
-      await Promise.all([
-        loadDashboard(),
-        loadInventory(),
-      ]);
+      try {
+        await Promise.all([
+          loadDashboard(),
+          loadInventory(),
+          loadStaff(),
+        ]);
 
-      setBookingRefreshKey((current) => current + 1);
-    } catch (err) {
-      console.error("Failed to refresh admin dashboard:", err);
-    } finally {
-      setLoading(false);
+        setBookingRefreshKey((current) => current + 1);
+      } catch (err) {
+        console.error("Failed to refresh admin dashboard:", err);
+      } finally {
+        setLoading(false);
+      }
+    }, [loadDashboard, loadInventory, loadStaff]);
+
+  async function createStaffMember(event) {
+      event.preventDefault();
+      setSavingStaff(true);
+      setStaffMessage({ type: "", text: "" });
+
+      try {
+        await apiFetch("/staff", {
+          method: "POST",
+          body: JSON.stringify({
+            ...newStaff,
+            phone: newStaff.phone.trim() || null,
+          }),
+        });
+
+        setNewStaff({
+          name: "",
+          email: "",
+          phone: "",
+          role: "RESERVATIONS",
+          password: "",
+        });
+        setStaffMessage({ type: "success", text: "Staff account created." });
+        await loadStaff();
+      } catch (err) {
+        setStaffMessage({ type: "error", text: err.message });
+      } finally {
+        setSavingStaff(false);
+      }
     }
-  }, [loadDashboard, loadInventory]);
+
+    async function saveStaffMember(id) {
+      const draft = staffEdits[id];
+      if (!draft) return;
+      setStaffMessage({ type: "", text: "" });
+
+      try {
+        await apiFetch(`/staff/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: draft.name,
+            email: draft.email,
+            phone: draft.phone.trim() || null,
+            role: draft.role,
+          }),
+        });
+        setStaffMessage({ type: "success", text: "Staff details updated." });
+        await loadStaff();
+      } catch (err) {
+        setStaffMessage({ type: "error", text: err.message });
+      }
+    }
+
+    async function toggleStaffActive(member) {
+      setStaffMessage({ type: "", text: "" });
+      try {
+        await apiFetch(`/staff/${member.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ isActive: !member.isActive }),
+        });
+        await loadStaff();
+      } catch (err) {
+        setStaffMessage({ type: "error", text: err.message });
+      }
+    }
+
+    async function handleAdminPasswordReset(event) {
+      event.preventDefault();
+      if (!resetTarget) return;
+      setStaffMessage({ type: "", text: "" });
+
+      try {
+        await apiFetch(`/staff/${resetTarget.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ password: resetPasswordValue }),
+        });
+        setStaffMessage({
+          type: "success",
+          text: `Password updated for ${resetTarget.name}.`,
+        });
+        setResetTarget(null);
+        setResetPasswordValue("");
+      } catch (err) {
+        setStaffMessage({ type: "error", text: err.message });
+      }
+    }
+
+    async function deleteStaffMember(member) {
+      const confirmed = window.confirm(
+        `Permanently delete staff account "${member.name}" (${member.email})?`
+      );
+      if (!confirmed) return;
+
+      setStaffMessage({ type: "", text: "" });
+      try {
+        await apiFetch(`/staff/${member.id}`, { method: "DELETE" });
+        setStaffMessage({ type: "success", text: "Staff account deleted." });
+        await loadStaff();
+      } catch (err) {
+        setStaffMessage({ type: "error", text: err.message });
+      }
+    }
 
   useEffect(() => {
     if (!authLoading && user?.role === "ADMIN") {
@@ -886,7 +1020,290 @@ export default function AdminDashboardPage() {
             <EnquiryInbox showRefresh={false} />
           ) : activeSection === "promos" ? (
             <PromoCodes />
-          ) : (
+          ) : activeSection === "staff" ? (
+                      <div className="mt-8 space-y-10">
+                        {staffMessage.text && (
+                          <p
+                            className={`border p-4 text-xs ${
+                              staffMessage.type === "error"
+                                ? "border-red-200 bg-red-50 text-red-700"
+                                : "border-green-200 bg-green-50 text-green-800"
+                            }`}
+                          >
+                            {staffMessage.text}
+                          </p>
+                        )}
+
+                        {/* Create staff account */}
+                        <section>
+                          <div className="mb-5">
+                            <h2 className="font-display text-2xl text-forest">
+                              Add staff account
+                            </h2>
+                          </div>
+
+                          <form
+                            onSubmit={createStaffMember}
+                            className="grid gap-4 border border-[#e8e4db] bg-white p-5 sm:grid-cols-2 lg:grid-cols-5"
+                          >
+                            <div>
+                              <label className="mb-2 block text-xs font-semibold">Full name</label>
+                              <input
+                                required
+                                type="text"
+                                placeholder="e.g. Ananya Rao"
+                                value={newStaff.name}
+                                onChange={(e) => setNewStaff((s) => ({ ...s, name: e.target.value }))}
+                                className="h-11 w-full border border-[#dedbd2] px-3 text-sm outline-none focus:border-forest"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="mb-2 block text-xs font-semibold">Email</label>
+                              <input
+                                required
+                                type="email"
+                                placeholder="ananya@resort.in"
+                                value={newStaff.email}
+                                onChange={(e) => setNewStaff((s) => ({ ...s, email: e.target.value }))}
+                                className="h-11 w-full border border-[#dedbd2] px-3 text-sm outline-none focus:border-forest"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="mb-2 block text-xs font-semibold">Phone (optional)</label>
+                              <input
+                                type="tel"
+                                placeholder="+919876543210"
+                                value={newStaff.phone}
+                                onChange={(e) => setNewStaff((s) => ({ ...s, phone: e.target.value }))}
+                                className="h-11 w-full border border-[#dedbd2] px-3 text-sm outline-none focus:border-forest"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="mb-2 block text-xs font-semibold">Role</label>
+                              <select
+                                value={newStaff.role}
+                                onChange={(e) => setNewStaff((s) => ({ ...s, role: e.target.value }))}
+                                className="h-11 w-full border border-[#dedbd2] bg-white px-3 text-sm outline-none focus:border-forest"
+                              >
+                                <option value="RESERVATIONS">Reservations</option>
+                                <option value="SALES">Sales</option>
+                                <option value="GM">General Manager</option>
+                                <option value="ADMIN">Admin</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="mb-2 block text-xs font-semibold">Initial password</label>
+                              <input
+                                required
+                                type="password"
+                                minLength={8}
+                                placeholder="Min 8 characters"
+                                value={newStaff.password}
+                                onChange={(e) => setNewStaff((s) => ({ ...s, password: e.target.value }))}
+                                className="h-11 w-full border border-[#dedbd2] px-3 text-sm outline-none focus:border-forest"
+                              />
+                            </div>
+
+                            <button
+                              type="submit"
+                              disabled={savingStaff}
+                              className="flex h-11 items-center justify-center gap-2 bg-forest px-5 text-xs font-semibold text-white transition hover:bg-forest-dark disabled:opacity-50 sm:col-span-2 lg:col-span-5"
+                            >
+                              <Plus size={15} />
+                              {savingStaff ? "Creating..." : "Create staff account"}
+                            </button>
+                          </form>
+                        </section>
+
+                        {/* Admin password reset panel */}
+                        {resetTarget && (
+                          <section className="border border-forest/30 bg-white p-5">
+                            <div className="mb-4 flex items-center justify-between">
+                              <h3 className="font-display text-xl text-forest">
+                                Reset password for {resetTarget.name}
+                              </h3>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setResetTarget(null);
+                                  setResetPasswordValue("");
+                                }}
+                                className="text-stone-400 hover:text-coffee"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+
+                            <form onSubmit={handleAdminPasswordReset} className="flex flex-col gap-3 sm:flex-row">
+                              <input
+                                required
+                                type="password"
+                                minLength={8}
+                                placeholder="Enter new password (min 8 characters)"
+                                value={resetPasswordValue}
+                                onChange={(e) => setResetPasswordValue(e.target.value)}
+                                className="h-11 flex-1 border border-[#dedbd2] px-3 text-sm outline-none focus:border-forest"
+                              />
+                              <button
+                                type="submit"
+                                className="h-11 bg-forest px-6 text-xs font-semibold text-white transition hover:bg-forest-dark"
+                              >
+                                Set new password
+                              </button>
+                            </form>
+                          </section>
+                        )}
+
+                        {/* Staff directory */}
+                        <section>
+                          <div className="mb-5">
+                            <h2 className="font-display text-2xl text-forest">
+                              Staff accounts
+                            </h2>
+                          </div>
+
+                          <div className="overflow-x-auto border border-[#e8e4db] bg-white">
+                            <table className="w-full min-w-[780px] text-left">
+                              <thead className="border-b border-[#eeeae2] bg-ivory/60 text-[10px] uppercase tracking-wider text-stone-500">
+                                <tr>
+                                  <th className="px-5 py-4">Name</th>
+                                  <th className="px-5 py-4">Email</th>
+                                  <th className="px-5 py-4">Phone</th>
+                                  <th className="px-5 py-4">Role</th>
+                                  <th className="px-5 py-4">Status</th>
+                                  <th className="px-5 py-4">Actions</th>
+                                </tr>
+                              </thead>
+
+                              <tbody>
+                                {staffList.map((member) => {
+                                  const edit = staffEdits[member.id] || member;
+                                  const isSelf = member.id === user.id;
+
+                                  return (
+                                    <tr key={member.id} className="border-b border-[#eeeae2] last:border-0">
+                                      <td className="px-5 py-4">
+                                        <input
+                                          type="text"
+                                          value={edit.name}
+                                          onChange={(e) =>
+                                            setStaffEdits((prev) => ({
+                                              ...prev,
+                                              [member.id]: { ...edit, name: e.target.value },
+                                            }))
+                                          }
+                                          className="w-40 border border-[#dedbd2] px-2.5 py-1.5 text-xs outline-none focus:border-forest"
+                                        />
+                                      </td>
+
+                                      <td className="px-5 py-4">
+                                        <input
+                                          type="email"
+                                          value={edit.email}
+                                          onChange={(e) =>
+                                            setStaffEdits((prev) => ({
+                                              ...prev,
+                                              [member.id]: { ...edit, email: e.target.value },
+                                            }))
+                                          }
+                                          className="w-48 border border-[#dedbd2] px-2.5 py-1.5 text-xs outline-none focus:border-forest"
+                                        />
+                                      </td>
+
+                                      <td className="px-5 py-4">
+                                        <input
+                                          type="tel"
+                                          placeholder="—"
+                                          value={edit.phone}
+                                          onChange={(e) =>
+                                            setStaffEdits((prev) => ({
+                                              ...prev,
+                                              [member.id]: { ...edit, phone: e.target.value },
+                                            }))
+                                          }
+                                          className="w-36 border border-[#dedbd2] px-2.5 py-1.5 text-xs outline-none focus:border-forest"
+                                        />
+                                      </td>
+
+                                      <td className="px-5 py-4">
+                                        <select
+                                          value={edit.role}
+                                          onChange={(e) =>
+                                            setStaffEdits((prev) => ({
+                                              ...prev,
+                                              [member.id]: { ...edit, role: e.target.value },
+                                            }))
+                                          }
+                                          className="border border-[#dedbd2] bg-white px-2.5 py-1.5 text-xs outline-none focus:border-forest"
+                                        >
+                                          <option value="RESERVATIONS">RESERVATIONS</option>
+                                          <option value="SALES">SALES</option>
+                                          <option value="GM">GM</option>
+                                          <option value="ADMIN">ADMIN</option>
+                                        </select>
+                                      </td>
+
+                                      <td className="px-5 py-4">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleStaffActive(member)}
+                                          className={`text-[10px] font-semibold underline-offset-2 hover:underline ${
+                                            member.isActive ? "text-green-700" : "text-amber-700"
+                                          }`}
+                                        >
+                                          {member.isActive ? "Active" : "Inactive"}
+                                        </button>
+                                      </td>
+
+                                      <td className="px-5 py-4">
+                                        <div className="flex items-center gap-3">
+                                          <button
+                                            type="button"
+                                            onClick={() => saveStaffMember(member.id)}
+                                            title="Save changes"
+                                            className="flex items-center gap-1 text-xs font-semibold text-forest hover:text-wood"
+                                          >
+                                            <Save size={14} />
+                                            Save
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setResetTarget(member);
+                                              setResetPasswordValue("");
+                                            }}
+                                            title="Reset password"
+                                            className="text-wood hover:text-forest"
+                                          >
+                                            <KeyRound size={15} />
+                                          </button>
+
+                                          {!isSelf && (
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteStaffMember(member)}
+                                              title="Delete account"
+                                              className="text-red-500 hover:text-red-700"
+                                            >
+                                              <Trash2 size={15} />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+        </div>
+        ) : (
           <div className="mt-8 space-y-10">
 
                   {/* Create room category */}

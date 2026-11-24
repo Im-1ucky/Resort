@@ -669,7 +669,6 @@ router.post("/:id/cancel", bookingLimiter, async (req, res) => {
           "ADMIN",
           "RESERVATIONS",
           "GM",
-          "DEV",
         ];
 
         const isAuthorizedStaff =
@@ -830,7 +829,7 @@ router.post("/:id/cancel", bookingLimiter, async (req, res) => {
 router.get(
   "/",
   authenticate,
-  authorize("ADMIN", "RESERVATIONS", "GM", "DEV"),
+  authorize("ADMIN", "RESERVATIONS", "GM"),
   async (req, res) => {
     const querySchema = z.object({
       search: z.string().trim().max(100).optional(),
@@ -956,7 +955,7 @@ router.get(
 router.get(
   "/export",
   authenticate,
-  authorize("ADMIN", "RESERVATIONS", "GM", "DEV"),
+  authorize("ADMIN", "RESERVATIONS", "GM"),
   async (req, res) => {
     const querySchema = z.object({
       from: z.iso.date().optional(),
@@ -1171,7 +1170,7 @@ router.get(
 router.get(
   "/:id",
   authenticate,
-  authorize("ADMIN", "RESERVATIONS", "GM", "DEV"),
+  authorize("ADMIN", "RESERVATIONS", "GM"),
   async (req, res) => {
     try {
       const idResult = z.string().uuid().safeParse(req.params.id);
